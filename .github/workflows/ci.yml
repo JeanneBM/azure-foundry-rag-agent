@@ -1,4 +1,4 @@
-name: Validate and deploy Foundry RAG
+name: Validate Foundry RAG (offline)
 
 on:
   push:
@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      deploy:
-        description: Create a candidate agent version and run live smoke checks
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -38,68 +33,3 @@ jobs:
         run: ruff format --check .
       - name: Unit and SDK contract tests
         run: python -m pytest -q
-
-  deploy-agent:
-    needs: validate
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production
-    concurrency:
-      group: foundry-rag-production
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      PROJECT_ENDPOINT: ${{ vars.PROJECT_ENDPOINT }}
-      RAG_MCP_ENDPOINT: ${{ vars.RAG_MCP_ENDPOINT }}
-      PROJECT_CONNECTION_NAME: ${{ vars.PROJECT_CONNECTION_NAME }}
-      AGENT_NAME: ${{ vars.AGENT_NAME || 'RagAgent' }}
-      MODEL_DEPLOYMENT: ${{ vars.MODEL_DEPLOYMENT || 'gpt-4.1-mini' }}
-      AZURE_CREDENTIAL_MODE: cli
-      AGENT_VERSION: ""
-      DEPLOYMENT_FILE: deployment.json
-      SMOKE_KNOWN_QUESTION: ${{ vars.SMOKE_KNOWN_QUESTION }}
-      SMOKE_EXPECTED_SUBSTRING: ${{ vars.SMOKE_EXPECTED_SUBSTRING }}
-      SMOKE_UNKNOWN_QUESTION: ${{ vars.SMOKE_UNKNOWN_QUESTION }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - name: Validate deployment configuration before Azure writes
-        run: |
-          python - <<'PY'
-          import os
-          required = (
-              "PROJECT_ENDPOINT", "RAG_MCP_ENDPOINT", "PROJECT_CONNECTION_NAME",
-              "SMOKE_KNOWN_QUESTION", "SMOKE_EXPECTED_SUBSTRING", "SMOKE_UNKNOWN_QUESTION",
-          )
-          missing = [key for key in required if not os.getenv(key, "").strip()]
-          if missing:
-              raise SystemExit("Missing GitHub variables: " + ", ".join(missing))
-          PY
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Install locked runtime
-        run: python -m pip install --require-hashes -r requirements.txt
-      - name: Create or reuse candidate version
-        run: python create_rag_agent.py
-      - name: Verify candidate against the real knowledge base
-        run: |
-          python smoke_test.py \
-            --known-question "$SMOKE_KNOWN_QUESTION" \
-            --expected-substring "$SMOKE_EXPECTED_SUBSTRING" \
-            --unknown-question "$SMOKE_UNKNOWN_QUESTION"
-      - name: Save verified release manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: foundry-rag-release-${{ github.sha }}
-          path: deployment.json
-          if-no-files-found: error
-          retention-days: 90
