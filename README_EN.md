@@ -2,7 +2,7 @@
 
 A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. This repository deploys the **agent definition**; it does not provision Azure infrastructure, ingest documents, or serve an HTTP API.
 
-[Complete documentation](README.md) · [CI/CD and OIDC setup](GITHUB_ACTIONS.md)
+[Complete documentation](README.md) · [Offline CI setup](GITHUB_ACTIONS.md)
 
 ## Prerequisites
 
@@ -83,9 +83,11 @@ python delete_rag_agent.py --all --yes
 
 There is no implicit deletion target. Move clients away from a version before deleting it; deletion does not update existing manifests or client configuration.
 
-## CI/CD and development
+## Offline CI and local deployment
 
-Pushes and PRs to `main` run lint, formatting, offline tests and dependency checks. A manual workflow dispatch on `main` with `deploy=true` creates or reuses a candidate using OIDC, runs live KB smoke checks, then uploads the verified release manifest. See [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
+Pushes and PRs to `main` run only lint, formatting, offline tests and dependency checks. GitHub Actions does not authenticate to Azure or deploy agents, including on manual workflow dispatch. It has no OIDC permission, Azure secrets or deployment job. See [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
+
+Deploy and run live smoke checks on your own machine using the commands above after `az login`. Retain the verified local manifest and pin its agent version in client environments.
 
 ```bash
 python -m pip install --require-hashes -r requirements-dev.txt

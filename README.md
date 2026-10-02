@@ -4,7 +4,7 @@ A RAG agent on Microsoft Foundry Agent Service that uses an Azure AI Search Know
 
 The client forces a `knowledge_base_retrieve` call and validates the result before displaying the answer. Factual answers must cite identifiers actually returned by the current retrieval. These checks establish source provenance, but do not prove that every sentence follows from the documents. Retrieval quality and answer faithfulness require evaluation on your target data.
 
-[Quick-start guide](README_EN.md) · [GitHub Actions and OIDC](GITHUB_ACTIONS.md)
+[Quick-start guide](README_EN.md) · [Offline GitHub Actions](GITHUB_ACTIONS.md)
 
 ## Requirements and scope
 
@@ -12,7 +12,7 @@ The client forces a `knowledge_base_retrieve` call and validates the result befo
 - A Foundry project with a deployed model supporting the Responses API and MCP.
 - Azure AI Search with a ready Knowledge Base and completed indexing.
 - A Foundry RemoteTool connection pointing to the exact MCP endpoint.
-- Azure CLI for local authentication and OIDC in CI, or Managed Identity in an Azure runtime.
+- Azure CLI for local authentication, or Managed Identity in an Azure runtime.
 
 This is a managed Foundry agent deployment and a CLI client. The repository does not provision infrastructure, index documents or expose a public HTTP API. Response validation is implemented by this repository's client; calling the agent through another client bypasses these checks.
 
@@ -22,7 +22,7 @@ This is a managed Foundry agent deployment and a CLI client. The repository does
 2. Deploy your chosen model in the Foundry project. `MODEL_DEPLOYMENT` is the **deployment name**, not the model's catalog name.
 3. Create a RemoteTool connection to the Knowledge Base endpoint. For Managed Identity authentication, set the audience to `https://search.azure.com/` and grant the identity used by the connection the **Search Index Data Reader** role on the Search service. Verify the actual identity in the connection settings.
 4. Grant the deployment identity permissions to manage project agents and invoke the model, for example **Foundry User** (formerly Azure AI User) on the appropriate Foundry resource, according to your organization's RBAC policy. Limit the scope to the required resource.
-5. Ensure network connectivity for both client → Foundry and Foundry → Search. For private endpoints, use an appropriately connected runtime and CI runner.
+5. Ensure network connectivity for both client → Foundry and Foundry → Search. For private endpoints, use an appropriately connected runtime.
 
 All users of this client share the KB connection's permissions. There is no user identity passthrough or separate document ACL enforcement. The knowledge base and its connection must be intended for a shared, authorized audience.
 
@@ -111,9 +111,11 @@ python delete_rag_agent.py --all --yes
 
 There is no default version to delete. Deletion does not update manifests or client configuration — first move clients to a version you will retain.
 
-## CI/CD and development
+## Offline CI and local deployment
 
-Pushes and PRs to `main` run lint, formatting, offline tests and dependency checks. A manual `workflow_dispatch` with `deploy=true` on `main` creates a candidate through OIDC, checks it against the real KB and saves the manifest as an artifact only after success. Setup: [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
+Pushes and PRs to `main` run only lint, formatting, offline tests and dependency checks. GitHub Actions has no Azure login, OIDC permission, Azure secrets or deployment job. A manual workflow dispatch runs the same offline checks. See [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
+
+Deploy and verify from your own machine using `az login`, `python create_rag_agent.py` and `python smoke_test.py`. Keep the verified `deployment.json` locally and pin its version in your client configuration.
 
 ```bash
 python -m pip install --require-hashes -r requirements-dev.txt
