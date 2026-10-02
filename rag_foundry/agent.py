@@ -58,6 +58,6 @@ def deploy(project, settings: Settings, *, force: bool = False):
     agent = project.agents.create_version(
         agent_name=settings.agent_name,
         definition=desired,
-        metadata={"config_sha256": digest, "managed_by": "jb-foundry-rag-agent"},
+        metadata={"config_sha256": digest, "managed_by": "azure-foundry-rag-agent"},
     )
     return agent, True, digest
