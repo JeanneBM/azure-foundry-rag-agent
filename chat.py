@@ -1,72 +1,79 @@
-"""Interactive chat with the Azure Foundry RAG agent."""
+"""Interactive or one-shot chat with a pinned Foundry RAG agent version."""
 
-from __future__ import annotations
-
-import os
+import argparse
+import json
 import sys
 
-from azure.ai.projects import AIProjectClient
-from azure.identity import DefaultAzureCredential
-from dotenv import load_dotenv
+from azure.core.exceptions import AzureError
+from openai import APIError
 
-load_dotenv()
+from rag_foundry.clients import project_client, responses_client
+from rag_foundry.config import ConfigError, Settings
+from rag_foundry.deployment import resolve_version
+from rag_foundry.errors import report_error, run
+from rag_foundry.grounding import GroundingError
+from rag_foundry.session import RagSession
 
 
-def _require_env() -> tuple[str, str]:
-    endpoint = os.getenv("PROJECT_ENDPOINT")
-    if not endpoint:
+def print_answer(answer, *, as_json: bool = False) -> None:
+    if as_json:
         print(
-            "Missing PROJECT_ENDPOINT.\n"
-            "Copy .env.example to .env and fill in the values.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    agent_name = os.environ.get("AGENT_NAME", "RagAgent")
-    return endpoint, agent_name
-
-
-def main() -> None:
-    project_endpoint, agent_name = _require_env()
-
-    project = AIProjectClient(
-        endpoint=project_endpoint,
-        credential=DefaultAzureCredential(),
-    )
-    openai = project.get_openai_client()
-
-    conversation = openai.conversations.create()
-    print(f"Conversation created: {conversation.id}")
-    print("Type your question (or 'exit' / 'quit' / 'q' to quit)\n")
-
-    while True:
-        try:
-            user_input = input("You: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nBye!")
-            break
-
-        if not user_input:
-            continue
-        if user_input.lower() in {"exit", "quit", "q"}:
-            print("Bye!")
-            break
-
-        try:
-            response = openai.responses.create(
-                conversation=conversation.id,
-                input=user_input,
-                extra_body={
-                    "agent_reference": {
-                        "name": agent_name,
-                        "type": "agent_reference",
-                    }
+            json.dumps(
+                {
+                    "answer": answer.text,
+                    "sources": answer.sources,
+                    "response_id": answer.response_id,
+                    "unknown": answer.unknown,
                 },
+                ensure_ascii=False,
             )
-            print(f"\nAgent: {response.output_text}\n")
-        except Exception as exc:  # noqa: BLE001 – surface Azure/network errors clearly
-            print(f"\nError: {exc}\n", file=sys.stderr)
+        )
+        return
+    print(f"\nAgent: {answer.text}\n")
+    if answer.sources:
+        print("Sources:")
+        for source in answer.sources:
+            print(json.dumps(source, ensure_ascii=False))
+        print()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version", help="Explicit agent version; overrides AGENT_VERSION")
+    parser.add_argument("--question", help="Ask once and exit (suitable for smoke checks)")
+    parser.add_argument("--json", action="store_true", help="JSON output for --question")
+    args = parser.parse_args()
+    if args.json and args.question is None:
+        parser.error("--json requires --question")
+    settings = Settings.from_env()
+    version = resolve_version(settings, args.version)
+    with project_client(settings) as project:
+        project.agents.get_version(settings.agent_name, version)
+        with responses_client(project, settings) as client:
+            session = RagSession(client, settings, version)
+            if args.question is not None:
+                print_answer(session.ask(args.question), as_json=args.json)
+                return 0
+            print(f"Agent: {settings.agent_name}, version {version}. Type exit to quit.")
+            while True:
+                try:
+                    question = input("You: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    print("\nBye!")
+                    return 0
+                if question.lower() in {"exit", "quit", "q"}:
+                    return 0
+                if not question:
+                    continue
+                try:
+                    print_answer(session.ask(question))
+                except GroundingError as exc:
+                    print("\nAgent: I don't know\n")
+                    report_error(exc)
+                except (ConfigError, AzureError, APIError) as exc:
+                    report_error(exc)
+                    print("Request failed. You can retry or exit.", file=sys.stderr)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(run(main))

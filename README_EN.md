@@ -1,236 +1,106 @@
 # Azure Foundry RAG Agent
 
-A classic RAG (Retrieval-Augmented Generation) agent built on **Azure AI Foundry Agent Service**, using an **Azure AI Search Knowledge Base** as its knowledge source, connected via the **Model Context Protocol (MCP)**.
+A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. This repository deploys the **agent definition**; it does not provision Azure infrastructure, ingest documents, or serve an HTTP API.
 
-The agent answers questions **only** using information from the connected knowledge base. It does not invent facts — if something isn't in the knowledge base, it replies "I don't know".
-
----
-
-## How it works (in short)
-
-```
-User question
-        │
-        ▼
-   Agent (Foundry)
-        │  calls the MCP tool: knowledge_base_retrieve
-        ▼
-Azure AI Search Knowledge Base
-   - query planning / decomposition
-   - hybrid / vector search
-   - semantic reranking
-        │
-        ▼
-Agent's answer with source citations
-```
-
-**Important:** this repository only handles the agent and query layer. **It does not create or populate the knowledge base** — that needs to be prepared beforehand in Azure AI Search (see Step 1 below).
-
-
-## What to expect (and its limitations)
-
-In short: **yes, you can upload any documents to the Knowledge Base and ask any questions** — the agent will answer based on the content you upload, not from the model's general knowledge. If something isn't in the knowledge base, it should reply "I don't know" instead of making things up.
-
-That said, it's worth understanding a few nuances so you don't get surprised by the quality of the answers:
-
-- **Any question ≠ always an accurate answer.** Answer quality depends on whether the retrieval step (hybrid/vector search + semantic reranking) actually finds matching fragments. If your question uses very different wording than the documents, results may be weaker.
-- **Documents are split into chunks before indexing.** If an answer requires combining information scattered across multiple parts of a document, the model may miss it, since it only sees selected chunks, not the whole document at once.
-- **This is not 100% hallucination-proof.** The agent's instructions *ask* the model to stick to the sources and say "I don't know" when data is missing — that's prompt engineering, not a hard technical guarantee. A well-configured RAG setup significantly reduces the risk of making things up, but doesn't eliminate it entirely.
-- **The topical scope is limited by the agent's own system prompt** (in `create_rag_agent.py`) — if you ask about something completely unrelated to the knowledge base content (e.g. general knowledge outside the documents), the agent should say "I don't know" rather than answer from the model's own knowledge.
----
+[Polish documentation](README.md) · [CI/CD and OIDC setup](GITHUB_ACTIONS.md)
 
 ## Prerequisites
 
-- Python 3.10+
-- An Azure account with an active subscription
-- Azure CLI installed locally
-- Permissions to create resources in Azure AI Foundry and Azure AI Search
+Use Python **3.12**, an existing Foundry project and deployed Responses/MCP-compatible model, a populated Search Knowledge Base, and a RemoteTool project connection pointing at its MCP endpoint.
 
----
+For managed-identity connection authentication, configure the Search audience and grant the actual connection identity **Search Index Data Reader** on Search. The deployment identity needs permissions to manage agents and invoke the model, for example **Foundry User** (formerly Azure AI User) at the appropriate Foundry scope according to your organization's RBAC policy. Validate both client-to-Foundry and Foundry-to-Search network access.
 
-## Step 1 — Prepare the Knowledge Base in Azure AI Search (outside this repo)
+The client uses the connection's shared KB access. It does not implement per-user document ACL enforcement or token passthrough. Only use a KB that all intended users are authorized to read.
 
-Before running anything from this project, you need a ready **Knowledge Base** in Azure AI Search. This is a separate step, done in the Azure Portal (or via Azure CLI/SDK), and **this project does not automate it**.
-
-1. Create an **Azure AI Search** service (if you don't already have one); the pricing tier must support Knowledge Bases.
-2. Within the service, create a **Knowledge Base** resource and connect a data source to it, e.g.:
-   - Azure Blob Storage with documents (PDF, DOCX, TXT, HTML, etc.)
-   - or another supported data connector
-3. Configure data enrichment (skillset) — chunking, text extraction, embeddings — Azure AI Search handles this automatically on the service side.
-4. Wait for indexing to complete and for the Knowledge Base to be ready for queries.
-5. Note down:
-   - the Search service name (`<search-service>`)
-   - the Knowledge Base name (`<kb-name>`)
-
-> Input file formats and indexing details depend on how your Knowledge Base is configured in Azure AI Search — this is set up in the service itself, not in this repository.
-
----
-
-## Step 2 — Set up the Azure AI Foundry project
-
-1. Create a project in **Microsoft Foundry** (Azure AI Foundry Portal).
-2. Deploy an LLM in the project (e.g. `gpt-4.1-mini` or `gpt-5-mini`).
-3. In the **Connections** section, create a **RemoteTool**-type connection to your Azure AI Search Knowledge Base.
-4. Grant the project's **Managed Identity** the **Search Index Data Reader** role on the Azure AI Search service — without this, the agent won't be able to access the data.
-
----
-
-## Step 3 — Log in to Azure locally
+## Install and configure
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install --require-hashes -r requirements.txt
+python -m pip check
+cp .env.example .env
 az login
 ```
 
-The project uses `DefaultAzureCredential`, so local authentication via Azure CLI is enough for testing.
+Fill in the project endpoint, KB MCP endpoint and RemoteTool connection name. Model deployment and agent name default to `gpt-4.1-mini` and `RagAgent`. Process environment variables override the local `.env`.
 
----
+Set `AZURE_CREDENTIAL_MODE=cli` for explicit Azure CLI authentication, `managed_identity` for an Azure runtime, or `default` for the noninteractive Entra credential chain. For a user-assigned runtime identity, set `MANAGED_IDENTITY_CLIENT_ID`.
 
-## Step 4 — Clone the repo and install dependencies
+The example Search endpoint uses GA API `2026-04-01` for extractive retrieval. Use your actual Azure-provided endpoint if it requires another version. Assess preview features separately before production use. The grounding parser accepts nonempty `content` records with `ref_id`, directly or wrapped in MCP `content[].text` or `result.content[].text`. Unknown schemas are rejected.
 
-```bash
-git clone https://github.com/JeanneBM/jb_classic-rag-foundry.git
-cd jb_classic-rag-foundry
-
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-
-pip install -r requirements.txt
-```
-
----
-
-## Step 5 — Configure environment variables
-
-1. Copy the example file:
-
-```bash
-cp .env.example .env
-```
-
-2. Fill in `.env` with values from your Azure environment:
-
-```
-# Foundry project endpoint
-PROJECT_ENDPOINT=https://<resource>.services.ai.azure.com/api/projects/<project>
-
-# Knowledge Base MCP endpoint (Azure AI Search)
-RAG_MCP_ENDPOINT=https://<search-service>.search.windows.net/knowledgebases/<kb-name>/mcp?api-version=2025-11-01-preview
-
-# Project Connection name (RemoteTool type)
-PROJECT_CONNECTION_NAME=my-kb-connection
-
-# Optional
-AGENT_NAME=RagAgent
-MODEL_DEPLOYMENT=gpt-4.1-mini
-```
-
-### Where to find each value
-
-| Variable | Location |
+| Setting | Default / purpose |
 |---|---|
-| `PROJECT_ENDPOINT` | Foundry Portal → Project → Overview / Endpoints |
-| `RAG_MCP_ENDPOINT` | Azure AI Search → Knowledge bases → selected KB → MCP endpoint |
-| `PROJECT_CONNECTION_NAME` | Foundry Portal → Project → Connections (RemoteTool) |
-| `MODEL_DEPLOYMENT` | Foundry Portal → Models + endpoints |
+| `AGENT_VERSION` | Explicit tested version; otherwise use the release manifest |
+| `DEPLOYMENT_FILE` | `deployment.json` |
+| `REQUEST_TIMEOUT_SECONDS` | 120 seconds per request attempt |
+| `MAX_OUTPUT_TOKENS` | 2048 |
+| `MAX_QUESTION_CHARS` | 8000 |
+| `HISTORY_TURNS` | 6 accepted turns; 0 disables history |
 
----
-
-## Step 6 — Create the agent
+## Deploy and verify
 
 ```bash
 python create_rag_agent.py
+python smoke_test.py \
+  --known-question "What is the documented return period?" \
+  --expected-substring "30 days" \
+  --unknown-question "What is a private phone number absent from the documents?"
 ```
 
-This script creates (or updates) an agent named as per `AGENT_NAME` (default `RagAgent`) with the MCP Knowledge Base tool attached.
+Replace these sample questions and expected substring with tests for your KB. The known-answer check requires actual retrieval, valid citations and the expected substring. The unknown-answer check requires exact `I don't know`. Retrieval or validation failures exit with code 1.
 
-If you see a message about missing environment variables in the console — go back to Step 5 and complete `.env`.
+Deployment reuses the latest version when its complete definition matches. A changed definition, or `--force`, creates a new immutable version. An atomic manifest records the candidate version. Treat it as a verified release only after live checks pass.
 
-On success you'll see:
-
-```
-Agent created successfully:
- ID      : ...
- Name    : RagAgent
- Version : ...
-```
-
----
-
-## Step 7 — Chat with the agent
+Pin the tested `AGENT_VERSION` in the client environment:
 
 ```bash
 python chat.py
+python chat.py --version 2 --question "What is the return period?" --json
 ```
 
-Ask a question related to the content in your knowledge base. The agent should answer with source citations, or reply "I don't know" if it can't find an answer.
+Version precedence is `--version`, then `AGENT_VERSION`, then a manifest matching the project endpoint and agent name. Clients never automatically select `latest`.
 
----
+## Grounding and errors
 
-## (Optional) Delete the agent
+Both the agent definition and each request force the KB retrieval tool. Before displaying a factual answer, the client checks response completion, successful MCP retrieval, nonempty evidence and citation IDs matching the current retrieval results. It displays `[ref_id:X]` citations and source metadata; it does not invent source URLs.
 
-To clean up after testing:
+These are provenance checks, **not proof that every claim follows from the cited evidence**. Evaluate answer accuracy and retrieval quality using representative data. Other clients calling the Foundry agent directly bypass this repository's response checks.
+
+Interactive validation failures display `I don't know` and a separate safe diagnostic on stderr. One-shot requests fail with code 1 and never emit rejected answers. Network and permission failures are distinguished from legitimate unknown answers. Remote error bodies and document chunks are not printed in diagnostics.
+
+Only accepted answers enter bounded local history. Each turn performs fresh retrieval. Requests use `store=False` without persistent Conversations; configure Azure service retention separately. Responses SDK retries are capped at two. Agent management has no automatic retries to avoid duplicate versions after a lost create response; inspect Azure state before retrying a timed-out deployment.
+
+## Rollback and cleanup
+
+Point clients at a previous verified version or restore its release manifest. Creating a candidate changes Foundry's `latest` before smoke checks, so all production clients must use an explicit version.
 
 ```bash
-python delete_rag_agent.py
+python delete_rag_agent.py --version 2 --yes
+python delete_rag_agent.py --all --yes
 ```
 
----
+There is no implicit deletion target. Move clients away from a version before deleting it; deletion does not update existing manifests or client configuration.
 
-## CI/CD via GitHub Actions (optional)
+## CI/CD and development
 
-If you want the agent to be created/updated automatically on every push to `main`, the repo includes a ready-made workflow (`.github/workflows/ci.yml`) using **OpenID Connect (OIDC)** — no Azure secrets stored in the repository.
+Pushes and PRs to `main` run lint, formatting, offline tests and dependency checks. A manual workflow dispatch on `main` with `deploy=true` creates or reuses a candidate using OIDC, runs live KB smoke checks, then uploads the verified release manifest. See [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
 
-This requires a one-time setup:
-
-1. Create an **App Registration** and **Service Principal** in Azure (`az ad app create`, `az ad sp create`).
-2. Grant roles: `Contributor` on the resource group, plus the appropriate roles on the Foundry project and the Azure AI Search service (`Search Index Data Reader`).
-3. Create a **Federated Credential** linking the repo/branch to the App Registration (no secrets involved).
-4. In GitHub → Settings → Secrets and variables → Actions, add: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, and optionally `PROJECT_ENDPOINT`, `RAG_MCP_ENDPOINT`, `PROJECT_CONNECTION_NAME` (if the workflow should create the agent itself in CI).
-
-The workflow has two stages: `lint` (Ruff) on every push/PR, and `deploy-agent` (runs `create_rag_agent.py`) only on the `main` branch, with optional `production` environment protection (required reviewers).
-
-> This step is optional — it is not needed for local usage (Steps 1–7 above).
-
----
-
-## Troubleshooting
-
-| Problem | Solution |
-|---|---|
-| Authentication failed | Run `az login` again |
-| Agent doesn't call the Knowledge Base | Check the agent's instructions and `allowed_tools=["knowledge_base_retrieve"]` in `create_rag_agent.py` |
-| 403 / Access denied | Verify the project's Managed Identity has the Search Index Data Reader role on the Search service |
-| Connection not found | Make sure `PROJECT_CONNECTION_NAME` exists in the Foundry project and is of type RemoteTool |
-| No response from the knowledge base | Check whether indexing in Azure AI Search has completed and the KB contains data |
-
----
-
-## Project structure
-
-```
-.
-├── .env                  # environment variables (do not commit)
-├── .env.example
-├── create_rag_agent.py   # creates/updates the agent
-├── delete_rag_agent.py   # deletes the agent
-├── chat.py                # sample conversation with the agent
-├── requirements.txt
-├── README.md
-├── GITHUB_ACTIONS.md
-└── .github/
-    └── workflows/
-        └── ci.yml
+```bash
+python -m pip install --require-hashes -r requirements-dev.txt
+ruff check .
+ruff format --check .
+python -m pytest -q
 ```
 
----
+Offline tests exercise actual SDK models and HTTP serialization, but cannot validate live RBAC, networking or KB content. Regenerate hashed runtime and development locks on Python 3.12 with `pip-tools==7.6.1` after changing the `.in` files, then rerun checks. Runtime dependencies exclude test and lint tools.
 
-## Important notes
+## Service references
 
-- The agent answers exclusively based on data from the Knowledge Base — never from the model's own knowledge.
-- `require_approval="never"` means MCP tool calls don't require manual approval on every question.
-- This project **does not handle** creating, uploading, or indexing documents in the Knowledge Base — that must be done separately in Azure AI Search (Step 1).
-
----
+- [Foundry KB connection](https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/foundry-iq-connect)
+- [Search MCP output and API versions](https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve)
+- [Foundry Responses API](https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/aiproject)
 
 ## License
 

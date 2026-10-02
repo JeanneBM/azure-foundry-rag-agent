@@ -46,3 +46,7 @@ Desktop.ini
 *.log
 *.tmp
 .cache/
+
+# Release manifests are environment-specific; retain verified copies as release artifacts.
+deployment.json
+deployment.*.json

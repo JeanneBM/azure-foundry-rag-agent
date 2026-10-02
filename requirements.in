@@ -1,0 +1,7 @@
+# Runtime dependencies. Regenerate the hashed lock with pip-tools on Python 3.12.
+azure-ai-projects==2.0.0
+azure-identity==1.26.0
+python-dotenv==1.2.4
+openai==2.54.0
+# azure-ai-projects 2.0.0 imports httpx; OpenAI 3.x moved to httpx2.
+httpx[socks]==0.28.1
