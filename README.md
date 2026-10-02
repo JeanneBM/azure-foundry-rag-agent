@@ -29,8 +29,8 @@ All users of this client share the KB connection's permissions. There is no user
 ## Installation
 
 ```bash
-git clone https://github.com/JeanneBM/jb_classic-rag-foundry.git
-cd jb_classic-rag-foundry
+git clone https://github.com/JeanneBM/jb-foundry-rag-agent.git
+cd jb-foundry-rag-agent
 python -m venv .venv
 source .venv/bin/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1

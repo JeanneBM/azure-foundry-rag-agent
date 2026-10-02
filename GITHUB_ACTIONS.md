@@ -10,13 +10,15 @@ The workflow in `.github/workflows/ci.yml` runs validation on pushes and PRs to 
    | Field | Value |
    |---|---|
    | Issuer | `https://token.actions.githubusercontent.com` |
-   | Subject | `repo:JeanneBM/jb_classic-rag-foundry:environment:production` |
+   | Subject | `repo:JeanneBM/jb-foundry-rag-agent:environment:production` |
    | Audience | `api://AzureADTokenExchange` |
 
 3. Grant the principal permissions to manage agents and invoke the model in the target Foundry resource, according to your organization's RBAC policy. CI does not create resource groups or services, so it does not require a broad Contributor role for provisioning.
 4. Configure the RemoteTool connection's Search access separately. The CI identity and the agent connection identity use separate authentication paths.
 5. Create a GitHub Environment named `production`, allow the `main` branch and configure required reviewers if your organization's process requires them.
 6. Add the following secrets and variables to that environment. Do not add a client secret — authentication uses OIDC.
+
+After renaming the repository, update any existing Entra federated credential to use the subject above. A credential configured for the previous repository name will not match tokens issued for the renamed repository.
 
 | GitHub Environment secret | Value |
 |---|---|
