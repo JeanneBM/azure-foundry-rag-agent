@@ -2,7 +2,7 @@
 
 A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. This repository deploys the **agent definition**; it does not provision Azure infrastructure, ingest documents, or serve an HTTP API.
 
-[Polish documentation](README.md) · [CI/CD and OIDC setup](GITHUB_ACTIONS.md)
+[Complete documentation](README.md) · [CI/CD and OIDC setup](GITHUB_ACTIONS.md)
 
 ## Prerequisites
 

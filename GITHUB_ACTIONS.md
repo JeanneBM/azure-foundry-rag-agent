@@ -1,61 +1,65 @@
-# GitHub Actions: walidacja i wdrożenie przez OIDC
+# GitHub Actions: validation and deployment through OIDC
 
-Workflow `.github/workflows/ci.yml` wykonuje walidację na push/PR do `main`. Wdrożenie jest ręczne: Actions → Validate and deploy Foundry RAG → Run workflow → branch `main` → zaznacz `deploy`.
+The workflow in `.github/workflows/ci.yml` runs validation on pushes and PRs to `main`. Deployment is manual: Actions → Validate and deploy Foundry RAG → Run workflow → select the `main` branch → enable `deploy`.
 
-## Konfiguracja jednorazowa
+## One-time setup
 
-1. Utwórz App Registration i Service Principal w Microsoft Entra ID dla tego repozytorium.
-2. Dodaj federated credential z:
-   - issuer: `https://token.actions.githubusercontent.com`
-   - subject: `repo:JeanneBM/jb_classic-rag-foundry:environment:production`
-   - audience: `api://AzureADTokenExchange`
-3. Nadaj principalowi uprawnienia do zarządzania agentami i wywołania modelu w docelowym Foundry, zgodnie z RBAC organizacji. CI nie tworzy resource group ani usług, więc nie wymaga szerokiej roli Contributor do provisioningu.
-4. Skonfiguruj dostęp RemoteTool Connection do Search osobno. Tożsamość CI i tożsamość połączenia agenta to dwie różne ścieżki uwierzytelniania.
-5. Utwórz GitHub Environment `production`, dopuść branch `main` i ustaw wymaganych recenzentów, jeśli wymaga tego proces organizacji.
-6. Dodaj poniższe secrets i variables w tym środowisku. Nie dodawaj client secret — używany jest OIDC.
+1. Create an App Registration and Service Principal in Microsoft Entra ID for this repository.
+2. Add a federated credential with the following values:
 
-| GitHub Environment secrets | Wartość |
+   | Field | Value |
+   |---|---|
+   | Issuer | `https://token.actions.githubusercontent.com` |
+   | Subject | `repo:JeanneBM/jb_classic-rag-foundry:environment:production` |
+   | Audience | `api://AzureADTokenExchange` |
+
+3. Grant the principal permissions to manage agents and invoke the model in the target Foundry resource, according to your organization's RBAC policy. CI does not create resource groups or services, so it does not require a broad Contributor role for provisioning.
+4. Configure the RemoteTool connection's Search access separately. The CI identity and the agent connection identity use separate authentication paths.
+5. Create a GitHub Environment named `production`, allow the `main` branch and configure required reviewers if your organization's process requires them.
+6. Add the following secrets and variables to that environment. Do not add a client secret — authentication uses OIDC.
+
+| GitHub Environment secret | Value |
 |---|---|
-| `AZURE_CLIENT_ID` | Client ID App Registration |
+| `AZURE_CLIENT_ID` | App Registration client ID |
 | `AZURE_TENANT_ID` | Tenant ID |
 | `AZURE_SUBSCRIPTION_ID` | Subscription ID |
 
-| GitHub Environment variables | Wartość |
+| GitHub Environment variable | Value |
 |---|---|
-| `PROJECT_ENDPOINT` | Endpoint docelowego projektu Foundry |
-| `RAG_MCP_ENDPOINT` | Pełny endpoint istniejącej KB |
-| `PROJECT_CONNECTION_NAME` | Nazwa RemoteTool Connection |
-| `AGENT_NAME` | Opcjonalnie; domyślnie RagAgent |
-| `MODEL_DEPLOYMENT` | Opcjonalnie; domyślnie gpt-4.1-mini |
-| `SMOKE_KNOWN_QUESTION` | Pytanie ze znaną odpowiedzią w KB |
-| `SMOKE_EXPECTED_SUBSTRING` | Niepusty fragment oczekiwanej odpowiedzi |
-| `SMOKE_UNKNOWN_QUESTION` | Pytanie, na które KB nie ma odpowiedzi |
+| `PROJECT_ENDPOINT` | Target Foundry project endpoint |
+| `RAG_MCP_ENDPOINT` | Full endpoint of the existing KB |
+| `PROJECT_CONNECTION_NAME` | RemoteTool connection name |
+| `AGENT_NAME` | Optional; defaults to RagAgent |
+| `MODEL_DEPLOYMENT` | Optional; defaults to gpt-4.1-mini |
+| `SMOKE_KNOWN_QUESTION` | A question with a known answer in the KB |
+| `SMOKE_EXPECTED_SUBSTRING` | A nonempty substring of the expected answer |
+| `SMOKE_UNKNOWN_QUESTION` | A question the KB cannot answer |
 
-Pytania testowe w variables powinny być odpowiednie do przechowywania w konfiguracji GitHub. Skrypt nie wypisuje odpowiedzi ani dokumentów do logu deploymentu.
+Test questions stored in variables should be suitable for storage in GitHub configuration. The script does not print answers or documents to the deployment log.
 
-Dla private endpoints zmień runner `ubuntu-latest` na runner z dostępem do sieci Foundry. Dostęp Foundry → Search musi działać niezależnie od runnera.
+For private endpoints, replace the `ubuntu-latest` runner with one that can access the Foundry network. Foundry → Search connectivity must work independently of the runner.
 
-## Co dzieje się podczas wdrożenia
+## Deployment flow
 
-- Najpierw przechodzą lint, formatowanie, testy offline i `pip check`.
-- Job wdrożenia uzyskuje OIDC token dopiero po spełnieniu reguł Environment.
-- Wymagane zmienne są sprawdzane przed tworzeniem agenta.
-- Instalowany jest runtime z wersjami i hashami z `requirements.txt`.
-- Skrypt tworzy lub ponownie wykorzystuje wersję kandydata.
-- Dwa testy na rzeczywistej KB sprawdzają odpowiedź ze źródłami i przypadek braku wiedzy.
-- Dopiero po sukcesie zapisywany jest artifact `foundry-rag-release-<commit SHA>` z `deployment.json`, przechowywany przez 90 dni.
+- Lint, formatting, offline tests and `pip check` must pass first.
+- The deployment job obtains an OIDC token only after the Environment rules are satisfied.
+- Required variables are checked before creating the agent.
+- Runtime dependencies are installed using the versions and hashes in `requirements.txt`.
+- The script creates or reuses a candidate version.
+- Two tests against the real KB check a sourced answer and an unknown-answer case.
+- Only after success is the `foundry-rag-release-<commit SHA>` artifact saved with `deployment.json`, retained for 90 days.
 
-Joby deploymentu są wykonywane kolejno; nowy deployment nie przerywa już uruchomionego. Nie ma automatycznego wdrożenia na push ani kasowania wersji po nieudanym teście.
+Deployment jobs run sequentially; a new deployment does not interrupt one already running. There is no automatic deployment on push or deletion of versions after a failed test.
 
-## Promocja i rollback klienta
+## Client promotion and rollback
 
-Pobierz manifest z udanego runu. Ustaw jego `agent_version` jako `AGENT_VERSION` w środowisku klientów albo dostarcz manifest do klienta z pasującymi endpointem i nazwą agenta. Zachowaj poprzedni manifest poza tymczasowym runnerem. Artifact GitHub nie zastępuje trwałego rejestru wydań.
+Download the manifest from a successful run. Set its `agent_version` as `AGENT_VERSION` in client environments, or provide the manifest to a client with a matching endpoint and agent name. Retain the previous manifest outside the temporary runner. A GitHub artifact does not replace a durable release registry.
 
-Wdrożenie tworzy zasób agenta w Foundry; **nie aktualizuje automatycznie środowisk klientów**. Rollback to przełączenie klienta na poprzednią sprawdzoną wersję. Pozostałe wersje pozostają w Azure.
+Deployment creates an agent resource in Foundry; **it does not automatically update client environments**. Rollback switches clients to the previous verified version. Other versions remain in Azure.
 
-Niepowodzenie smoke testu blokuje zapis verified artifact. Kandydat może już istnieć w Azure i być `latest`, dlatego produkcyjne integracje muszą być przypięte do wersji. Po błędzie provisioning requestu sprawdź stan w Azure przed ręcznym powtórzeniem.
+A failed smoke test prevents the verified artifact from being saved. The candidate may already exist in Azure and be `latest`, so production integrations must pin a version. After a provisioning request fails, inspect the state in Azure before retrying manually.
 
-## Sprawdzenie lokalne
+## Local checks
 
 ```bash
 python -m pip install --require-hashes -r requirements-dev.txt
@@ -65,4 +69,4 @@ ruff format --check .
 python -m pytest -q
 ```
 
-Instrukcje usług: [Azure login przez OIDC](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect), [Foundry RBAC](https://learn.microsoft.com/en-us/azure/foundry/concepts/rbac-foundry).
+Service documentation: [Azure login through OIDC](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect), [Foundry RBAC](https://learn.microsoft.com/en-us/azure/foundry/concepts/rbac-foundry).
