@@ -284,25 +284,15 @@ def main():
     if args.action == "delete":
         delete(ROOT, args.confirm)
         return 0
+    if args.action == "smoke":
+        import subprocess
+
+        return subprocess.call([sys.executable, "scripts/validate_lab.py", "smoke"], cwd=ROOT)
     _, state = load(ROOT)
     if args.action == "check":
         owned_group(state)
         print(f"Recorded group ownership verified; setup complete: {state.get('ready', False)}")
         return 0
-    if args.action == "smoke":
-        return child(
-            ROOT,
-            state,
-            [
-                "smoke_test.py",
-                "--known-question",
-                "What is the product return period?",
-                "--expected-substring",
-                "30 days",
-                "--unknown-question",
-                "What is the private phone number of a person not mentioned in the documents?",
-            ],
-        )
     return child(
         ROOT, state, ["chat.py", *(["--question", args.question] if args.question else [])]
     )
