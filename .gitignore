@@ -50,3 +50,6 @@ Desktop.ini
 # Release manifests are environment-specific; retain verified copies as release artifacts.
 deployment.json
 deployment.*.json
+
+# Dedicated demo lab state and retired generations
+.local/

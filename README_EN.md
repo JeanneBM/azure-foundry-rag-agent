@@ -1,6 +1,6 @@
 # Azure Foundry RAG Agent
 
-A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. This repository deploys the **agent definition**; it does not provision Azure infrastructure, ingest documents, or serve an HTTP API.
+A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. The application deploys the **agent definition**. An optional [dedicated demo lab](README.md#dedicated-demo-lab-setup--smoke--run--delete) provisions isolated Azure resources and synthetic documents; no HTTP API is served.
 
 [Complete documentation](README.md) · [Offline CI setup](GITHUB_ACTIONS.md)
 

@@ -1,10 +1,54 @@
 # Azure Foundry RAG Agent
 
-A RAG agent on Microsoft Foundry Agent Service that uses an Azure AI Search Knowledge Base through MCP. This repository deploys an **agent version** and provides a terminal client. The knowledge base, indexes, model and RemoteTool connection must be prepared beforehand.
+A RAG agent on Microsoft Foundry Agent Service that uses an Azure AI Search Knowledge Base through MCP. This repository deploys an **agent version** and provides a terminal client. Use the dedicated demo lab below, or prepare your own knowledge base, indexes, model and RemoteTool connection.
 
 The client forces a `knowledge_base_retrieve` call and validates the result before displaying the answer. Factual answers must cite identifiers actually returned by the current retrieval. These checks establish source provenance, but do not prove that every sentence follows from the documents. Retrieval quality and answer faithfulness require evaluation on your target data.
 
 [Quick-start guide](README_EN.md) · [Offline GitHub Actions](GITHUB_ACTIONS.md)
+
+## Dedicated demo lab: setup → smoke → run → delete
+
+Use Python 3.12 and a current Azure CLI (2.80+ with Search `--knowledge-retrieval` support),
+with permissions to create resources and assign resource-scoped roles. Install the
+locked runtime dependencies in a virtual environment as shown below, then run
+these commands from the repository root, one at a time:
+
+```sh
+az login
+python scripts/lab.py setup --subscription '<YOUR_SUBSCRIPTION_ID>'
+python scripts/lab.py check
+python scripts/lab.py smoke
+python scripts/lab.py run
+python scripts/lab.py delete
+```
+
+`exit` ends the chat client. **Delete ends the Azure lab:** it waits for deletion
+and verifies the recorded resource group is absent. Noninteractive cleanup is
+`python scripts/lab.py delete --confirm rg-foundry-rag-demo`.
+
+Setup creates a dedicated Foundry account/project, `gpt-4.1-mini`, one Basic Search
+service, a text index with synthetic documents, a Knowledge Base and a
+project-managed-identity RemoteTool connection. It creates/reuses the agent
+version and isolates its manifest in `.local/deployment.json`. It saves generation
+and subscription state before provisioning, refuses unrelated groups, resumes
+partial setup and chooses fresh resource names after deletion. Keep `.local/`
+until cleanup completes. Existing RAG resources are not adopted or deleted.
+
+**Basic Search has ongoing charges while provisioned**, even when the chat is
+closed. Model inference is metered. Semantic search and knowledge retrieval use
+the free allowance; exhaustion can fail requests. This lab uses public endpoints
+and synthetic data only; it is not a production deployment. Search definitions
+use `2026-04-01`; the RemoteTool connection management API is preview
+(`2025-10-01-preview`). This new provisioning path is validated offline, with
+**live Azure setup and the known/unknown smoke test still required**.
+
+Use `--group`, `--location`, `--model`, `--model-version` or `--capacity` on setup to
+change defaults before the first run. Reuse the same parameters when resuming.
+`check` verifies recorded group ownership and setup state, not model/retrieval
+health. If setup fails, retain state and rerun it or use `delete`; there is no
+silent rollback of resources. Soft-deleted Cognitive Services accounts remain
+recoverable and are not purged. No AKS, Network Watcher or external resource group
+is created by this lab.
 
 ## Requirements and scope
 
@@ -14,7 +58,7 @@ The client forces a `knowledge_base_retrieve` call and validates the result befo
 - A Foundry RemoteTool connection pointing to the exact MCP endpoint.
 - Azure CLI for local authentication, or Managed Identity in an Azure runtime.
 
-This is a managed Foundry agent deployment and a CLI client. The repository does not provision infrastructure, index documents or expose a public HTTP API. Response validation is implemented by this repository's client; calling the agent through another client bypasses these checks.
+This is a managed Foundry agent deployment and a CLI client. The optional demo lab provisions isolated infrastructure and indexes synthetic documents; the application does not expose a public HTTP API. Response validation is implemented by this repository's client; calling the agent through another client bypasses these checks.
 
 ## Prepare Azure
 
