@@ -6,6 +6,15 @@ The client forces a `knowledge_base_retrieve` call and validates the result befo
 
 [Quick-start guide](README_EN.md) · [Offline GitHub Actions](GITHUB_ACTIONS.md)
 
+## Individual lab reports
+
+Use `python scripts/validate_lab.py smoke` for this repository's existing lab.
+For setup, smoke, verified deletion, recreation and another smoke/delete,
+use the explicit `cycle` command in the [lab validation guide](docs/lab-validation.md).
+Each run writes its own JSON/Markdown report under `.local/reports/`.
+Verdicts and exit codes: PASS (0), FAIL (1), INCONCLUSIVE (2).
+No combined report across repositories is produced.
+
 ## Dedicated demo lab: setup → smoke → run → delete
 
 Use Python 3.12 and a current Azure CLI (2.80+ with Search `--knowledge-retrieval` support),
