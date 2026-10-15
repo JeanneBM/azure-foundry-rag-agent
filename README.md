@@ -197,3 +197,12 @@ pip-compile --generate-hashes --no-emit-index-url --no-emit-trusted-host -o requ
 ## License
 
 MIT
+
+## Runtime observability
+
+Set `AGENT_TELEMETRY_FILE` to an absolute JSONL path watched by the platform monitor.
+Each client question emits a real-time run, observed MCP tool names, retrieved and
+cited reference IDs, provider token usage when present and its terminal outcome.
+Observation happens before grounding validation, so rejected answers remain visible.
+Raw questions, answers, retrieved chunks and tool arguments are excluded.
+The platform enables this automatically; clients launched elsewhere must opt in.

@@ -3,6 +3,8 @@
 from rag_foundry.agent import RETRIEVE_TOOL, SERVER_LABEL
 from rag_foundry.config import ConfigError, Settings
 from rag_foundry.grounding import validate_response
+from rag_foundry.observation import observe_response
+from rag_foundry.telemetry import Trace
 
 
 class RagSession:
@@ -18,6 +20,10 @@ class RagSession:
             raise ConfigError(
                 f"Question must contain 1–{self.settings.max_question_chars} characters."
             )
+        with Trace("rag") as trace:
+            return self._ask(question, trace)
+
+    def _ask(self, question, trace):
         user = {"role": "user", "content": question}
         response = self.client.responses.create(
             input=[*self.history, user],
@@ -32,6 +38,7 @@ class RagSession:
                 }
             },
         )
+        observe_response(response, trace)
         answer = validate_response(response)
         self.history.extend([user, {"role": "assistant", "content": answer.text}])
         limit = self.settings.history_turns * 2
