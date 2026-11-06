@@ -36,6 +36,19 @@ def test_empty_retrieval_can_only_produce_exact_unknown():
         validate_response(response_payload(records=[]))
 
 
+def test_fixed_refusal_tolerates_only_a_single_final_period():
+    answer = validate_response(response_payload("I don't know.", []))
+    assert answer.unknown and answer.sources == ()
+
+
+@pytest.mark.parametrize(
+    "text", ["I don't know..", "i don't know", "I don't know!", "I don't know. Probably 30 days."]
+)
+def test_refusal_variants_are_not_unknown(text):
+    with pytest.raises(GroundingError, match="missing_citations"):
+        validate_response(response_payload(text, []))
+
+
 @pytest.mark.parametrize(
     "text,reason",
     [

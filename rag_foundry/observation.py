@@ -1,7 +1,6 @@
 """Observe returned MCP records and citations independently of answer acceptance."""
 
-from rag_foundry.agent import UNKNOWN_ANSWER
-from rag_foundry.grounding import CITATION, GroundingError, _decode
+from rag_foundry.grounding import CITATION, GroundingError, _decode, is_unknown_answer
 
 
 def observe_response(response, trace):
@@ -40,6 +39,6 @@ def observe_response(response, trace):
         "answer",
         citations=list(dict.fromkeys(CITATION.findall(text))),
         retrieved=sorted(retrieved),
-        status="abstained" if text == UNKNOWN_ANSWER else "answered",
+        status="abstained" if is_unknown_answer(text) else "answered",
         attrs={"native_citation_count": native_citation_count},
     )

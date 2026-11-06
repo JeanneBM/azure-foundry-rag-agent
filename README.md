@@ -25,7 +25,8 @@ The lab indexes two synthetic documents from [examples/lab-documents.json](examp
 
 Try `What is the product return period?`, `What are the support hours?` and
 `What is Kubernetes?`. The last question is outside the demo corpus and should
-produce exactly `I don't know`. A validation error is a failed request, not a refusal.
+produce exactly `I don't know` (a single final period is tolerated). A validation
+error is a failed request, not a refusal.
 The interactive terminal displays an introduction with the demo's scope.
 
 ## How it works
