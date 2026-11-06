@@ -371,7 +371,9 @@ def main():
         print(f"Recorded group ownership verified; setup complete: {state.get('ready', False)}")
         return 0
     # Demo-specific introduction; not persisted, so existing lab state needs no repair.
-    chat_state = {**state, "environment": {**state["environment"], "CHAT_WELCOME": DEMO_WELCOME}}
+    # child() still refuses partial setup before using this environment.
+    environment = {**state.get("environment", {}), "CHAT_WELCOME": DEMO_WELCOME}
+    chat_state = {**state, "environment": environment}
     return child(
         ROOT, chat_state, ["chat.py", *(["--question", args.question] if args.question else [])]
     )
