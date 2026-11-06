@@ -93,9 +93,9 @@ a manually configured `.env`. For an existing KB, follow the separate
 [quickstart](docs/quickstart.md).
 
 Setup provisions a dedicated Foundry account/project, `gpt-4.1-mini`, a Basic Search
-service with one replica/partition, an index, two documents, a knowledge source,
-a knowledge base and a project-managed-identity RemoteTool connection. Defaults are
-`rg-foundry-rag-demo` and Sweden Central. Region, group, model, model version and
+service with one replica/partition and API keys disabled (Entra ID only), an index,
+two documents, a knowledge source, a knowledge base and a project-managed-identity
+RemoteTool connection. Defaults are `rg-foundry-rag-demo` and Sweden Central. Region, group, model, model version and
 capacity can be changed with setup flags **before the first run**; availability and
 quota depend on the subscription. The lab does not deploy AKS or a web application.
 
