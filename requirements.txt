@@ -14,9 +14,9 @@ anyio==4.15.1 \
     # via
     #   httpx
     #   openai
-azure-ai-projects==2.0.0 \
-    --hash=sha256:0892f075cf287d747be54c25bea93dc9406ad100d44efc2fdaadb26586ecf4ff \
-    --hash=sha256:e655e0e495d0c76077d95cc8e0d606fcdbf3f4dbdf1a8379cbd4bea1e34c401d
+azure-ai-projects==2.4.0 \
+    --hash=sha256:121154f70cf7de350a38a75e1da710f4e98b7d8114bc3b1ea25124469e34186f \
+    --hash=sha256:d9a9504b3a498d7300d23411f09d49096e2a184473250d6070093828b7b67e49
     # via -r requirements.in
 azure-core==1.41.0 \
     --hash=sha256:522b4011e8180b1a3dcd2024396a4e7fe9ac37fb8597db47163d230b5efe892d \
