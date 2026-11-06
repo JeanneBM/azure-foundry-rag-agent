@@ -2,7 +2,7 @@
 
 A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. The application deploys the **agent definition**. An optional [dedicated demo lab](../README.md#run-the-dedicated-demo-lab) provisions isolated Azure resources and synthetic documents; no HTTP API is served.
 
-[Complete documentation](../README.md) · [Offline CI setup](../GITHUB_ACTIONS.md)
+[Complete documentation](../README.md) · [Offline CI setup](github-actions.md)
 
 ## Prerequisites
 
@@ -39,6 +39,7 @@ The example MCP endpoint uses preview API `2026-08-01-preview`. The lab uses GA 
 | `MAX_OUTPUT_TOKENS` | 2048 |
 | `MAX_QUESTION_CHARS` | 8000 |
 | `HISTORY_TURNS` | 6 accepted turns; 0 disables history |
+| `CHAT_WELCOME` | Interactive introduction; blank uses a generic welcome |
 
 ## Deploy and verify
 
@@ -88,7 +89,7 @@ There is no implicit deletion target. Move clients away from a version before de
 
 ## Offline CI and local deployment
 
-Pushes and PRs to `main` run only lint, formatting, offline tests and dependency checks. GitHub Actions does not authenticate to Azure or deploy agents, including on manual workflow dispatch. It has no OIDC permission, Azure secrets or deployment job. See [GITHUB_ACTIONS.md](../GITHUB_ACTIONS.md).
+Pushes and PRs to `main` run only lint, formatting, offline tests and dependency checks. GitHub Actions does not authenticate to Azure or deploy agents, including on manual workflow dispatch. It has no OIDC permission, Azure secrets or deployment job. See [GitHub Actions](github-actions.md).
 
 Deploy and run live smoke checks on your own machine using the commands above after `az login`. Retain the verified local manifest and pin its agent version in client environments.
 

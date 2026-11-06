@@ -12,7 +12,7 @@ Answers are configured to be in English, cite retrieved sources and refuse quest
 outside the connected documents. This is a document Q&A demo, not a general assistant.
 
 [Use your own knowledge base](docs/quickstart.md) · [Lab reports](docs/lab-validation.md)
-· [Troubleshooting](docs/troubleshooting.md) · [GitHub Actions](GITHUB_ACTIONS.md)
+· [Troubleshooting](docs/troubleshooting.md) · [GitHub Actions](docs/github-actions.md)
 
 ## Demo knowledge base
 
@@ -48,7 +48,8 @@ envelope, including JSON-encoded MCP text wrappers.
 Citations can use `[ref_id:X]` with an actual returned ID or native `url_citation`
 annotations. A native URL must match exactly one document from the same retrieval,
 with valid text offsets. Unknown IDs, invented URLs, ambiguous matches, malformed
-results and uncited factual answers are rejected. Citation URLs are never fetched
+results and factual answers without any citation are rejected. The validator does
+not require a separate citation for every sentence. Citation URLs are never fetched
 by the validator.
 
 **These checks establish provenance, not whether every claim follows from its source.**
@@ -163,7 +164,7 @@ python -m pytest -q
 
 Tests cover SDK serialization, version reuse, both MCP envelopes, citation rejection,
 subscription isolation, telemetry and lab lifecycle/reporting. CI makes no live Azure
-calls; [GitHub Actions](GITHUB_ACTIONS.md) documents its scope.
+calls; [GitHub Actions](docs/github-actions.md) documents its scope.
 A separate CodeQL workflow scans Python on pushes, pull requests and weekly.
 The badges above show workflow results on `main`; they do not certify the absence of vulnerabilities.
 

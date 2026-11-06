@@ -66,6 +66,7 @@ class Settings:
     history_turns: int
     deployment_file: Path
     cli_subscription: str = ""
+    welcome_message: str = ""
 
     @classmethod
     def from_env(cls, *, deployment: bool = False) -> Settings:
@@ -121,4 +122,5 @@ class Settings:
             history_turns=_integer("HISTORY_TURNS", 6, 0, 20),
             deployment_file=Path(_value("DEPLOYMENT_FILE", "deployment.json")),
             cli_subscription=_value("AZURE_CLI_SUBSCRIPTION"),
+            welcome_message=_value("CHAT_WELCOME"),
         )

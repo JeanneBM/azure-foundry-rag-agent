@@ -23,6 +23,7 @@ def settings(monkeypatch, tmp_path):
         "MAX_OUTPUT_TOKENS",
         "MAX_QUESTION_CHARS",
         "HISTORY_TURNS",
+        "CHAT_WELCOME",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv(

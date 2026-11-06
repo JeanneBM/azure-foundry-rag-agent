@@ -14,6 +14,11 @@ from rag_foundry.errors import report_error, run
 from rag_foundry.grounding import GroundingError
 from rag_foundry.session import RagSession
 
+DEFAULT_WELCOME = (
+    "Welcome! I answer questions using the connected knowledge-base documents. "
+    "I provide source citations and do not answer questions outside the knowledge base."
+)
+
 
 def print_answer(answer, *, as_json: bool = False) -> None:
     if as_json:
@@ -55,18 +60,7 @@ def main() -> int:
                 print_answer(session.ask(args.question), as_json=args.json)
                 return 0
             print(f"Document Q&A Assistant — {settings.agent_name}, version {version}")
-            if settings.agent_name == "RagDemo":
-                print(
-                    "Welcome! I answer questions about product returns and support hours "
-                    "using the attached demo documents. I provide source citations and "
-                    "do not answer questions outside the knowledge base."
-                )
-            else:
-                print(
-                    "Welcome! I answer questions using the connected knowledge-base documents. "
-                    "I provide source citations and do not answer questions outside "
-                    "the knowledge base."
-                )
+            print(settings.welcome_message or DEFAULT_WELCOME)
             print("Type exit to close this chat.\n")
             while True:
                 try:

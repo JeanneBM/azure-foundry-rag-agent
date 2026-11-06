@@ -95,6 +95,18 @@ def test_live_smoke_command_contract(settings, monkeypatch, known, unknown, exit
     assert run(smoke_test.main) == exit_code
 
 
+@pytest.mark.parametrize("welcome", [None, "Custom introduction for this knowledge base."])
+def test_interactive_welcome_comes_from_configuration(settings, monkeypatch, capsys, welcome):
+    if welcome:
+        monkeypatch.setenv("CHAT_WELCOME", welcome)
+    monkeypatch.setattr(chat, "project_client", lambda cfg: nullcontext(Mock()))
+    monkeypatch.setattr(chat, "responses_client", lambda *args: nullcontext(Mock()))
+    monkeypatch.setattr(sys, "argv", ["chat.py", "--version", "2"])
+    monkeypatch.setattr("builtins.input", lambda _: "exit")
+    assert chat.main() == 0
+    assert (welcome or chat.DEFAULT_WELCOME) in capsys.readouterr().out
+
+
 def test_interactive_rejection_is_not_presented_as_unknown(settings, monkeypatch, capsys):
     project, client = Mock(), Mock()
     payload = response_payload()

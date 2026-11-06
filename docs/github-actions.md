@@ -27,7 +27,7 @@ python -m pytest -q
 
 Configure your local `.env`, log in with `az login` and run `python create_rag_agent.py` yourself. Then run `smoke_test.py` with questions tailored to your KB. The live smoke test contacts Azure only when you explicitly run it locally.
 
-The script writes the candidate version to local `deployment.json`. After verification, retain the manifest and set `AGENT_VERSION` in client environments. Rollback selects a previous verified version. Full instructions are in [README.md](README.md).
+The script writes the candidate version to local `deployment.json`. After verification, retain the manifest and set `AGENT_VERSION` in client environments. Rollback selects a previous verified version. Full instructions are in [README.md](../README.md).
 
 ## Supply-chain controls
 

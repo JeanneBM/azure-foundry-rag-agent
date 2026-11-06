@@ -25,6 +25,11 @@ SEARCH_API = "2026-04-01"
 MCP_API = "2026-08-01-preview"
 CONNECTION_API = "2025-10-01-preview"
 AZURE_AI_USER_ROLE_ID = "53ca6127-db72-4b80-b1b0-d745d6d5456d"
+DEMO_WELCOME = (
+    "Welcome! I answer questions about product returns and support hours using the "
+    "attached demo documents. I provide source citations and do not answer questions "
+    "outside the knowledge base."
+)
 
 
 def configure_demo_kb(state, endpoint):
@@ -365,8 +370,10 @@ def main():
         owned_group(state)
         print(f"Recorded group ownership verified; setup complete: {state.get('ready', False)}")
         return 0
+    # Demo-specific introduction; not persisted, so existing lab state needs no repair.
+    chat_state = {**state, "environment": {**state["environment"], "CHAT_WELCOME": DEMO_WELCOME}}
     return child(
-        ROOT, state, ["chat.py", *(["--question", args.question] if args.question else [])]
+        ROOT, chat_state, ["chat.py", *(["--question", args.question] if args.question else [])]
     )
 
 
