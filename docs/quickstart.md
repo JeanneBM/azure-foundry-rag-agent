@@ -49,7 +49,7 @@ python smoke_test.py \
   --unknown-question "What is a private phone number absent from the documents?"
 ```
 
-Replace these sample questions and expected substring with tests for your KB. The known-answer check requires actual retrieval, valid citations and the expected substring. The unknown-answer check requires exact English `I don't know`, even for Polish questions; the agent instructions explicitly make this an exception to the user-language rule. Retrieval or validation failures exit with code 1.
+Replace these sample questions and expected substring with tests for your KB. The known-answer check requires actual retrieval, valid citations and the expected substring. The unknown-answer check requires exact English `I don't know`, even for Polish questions; all agent responses are configured to be in English, regardless of the question language. Retrieval or validation failures exit with code 1.
 
 Deployment reuses the latest version when its stored `config_sha256` and `managed_by` metadata match the requested definition’s fingerprint. Server-added defaults do not affect reuse; versions without matching metadata create a new candidate. A changed definition, or `--force`, creates a new immutable version. An atomic manifest records the candidate version. Treat it as a verified release only after live checks pass.
 
