@@ -222,7 +222,7 @@ verifying the candidate. MCP is preview even though the provisioning Search API 
 
 ## Response language
 
-Supported factual answers follow the user’s language. Insufficient evidence always uses
+All answers must be in English, regardless of question or conversation language.\nInsufficient evidence always uses
 the fixed English sentinel `I don't know`, including for Polish questions; the instructions
 explicitly prohibit translating it. A localized refusal is rejected rather than silently
 accepted. Validation and transport failures are errors, not successful refusals.
