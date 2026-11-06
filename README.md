@@ -47,7 +47,7 @@ until cleanup completes. Existing RAG resources are not adopted or deleted.
 closed. Model inference is metered. Semantic search and knowledge retrieval use
 the free allowance; exhaustion can fail requests. This lab uses public endpoints
 and synthetic data only; it is not a production deployment. Search definitions
-use `2026-04-01`; the MCP endpoint uses `2026-08-01-preview` and the RemoteTool connection management API is preview
+use `2026-04-01` for the index/source; the knowledge base and MCP endpoint use `2026-08-01-preview` and the RemoteTool connection management API is preview
 (`2025-10-01-preview`). This new provisioning path is validated offline, with
 **live Azure setup and the known/unknown smoke test still required**.
 
@@ -112,8 +112,11 @@ Fill in `.env` with your actual values. Do not include tokens or keys in endpoin
 | `MAX_QUESTION_CHARS` | Question length limit; defaults to 8000 characters |
 | `HISTORY_TURNS` | Retained question/answer pairs; defaults to 6; 0 disables history |
 
-The lab uses GA Search API `2026-04-01` to provision the index and knowledge base,
-and preview API `2026-08-01-preview` for the MCP endpoint. If your KB configuration requires another version, use the endpoint provided by Azure. Assess preview features separately before production deployment. The parser accepts grounding records with `ref_id` and nonempty `content`, directly or wrapped in MCP `content[].text` / `result.content[].text`. Other formats are rejected.
+The lab uses GA Search API `2026-04-01` for the index and source, and preview
+`2026-08-01-preview` for the knowledge base and MCP endpoint. The knowledge base
+explicitly uses `minimal` reasoning and `extractiveData`: it needs no retrieval
+model; the Foundry agent generates the final answer. Preview defaults to `low`
+when reasoning is omitted, which requires a model on the knowledge base. If your KB configuration requires another version, use the endpoint provided by Azure. Assess preview features separately before production deployment. The parser accepts grounding records with `ref_id` and nonempty `content`, directly or wrapped in MCP `content[].text` / `result.content[].text`. Other formats are rejected.
 
 ## Create a version and verify the deployment
 
@@ -209,7 +212,8 @@ Treat it as operational data, not anonymous data. Telemetry is disabled unless e
 ## Repair an existing lab MCP endpoint
 
 If the MCP server rejects the API version, run `python scripts/lab.py repair-mcp`.
-This verifies recorded group ownership, updates the existing RemoteTool connection,
+This verifies recorded group ownership, sets the dedicated demo knowledge base to
+`minimal`/`extractiveData`, updates the existing RemoteTool connection,
 updates the saved endpoint, and creates or reuses an agent version with a new local
 manifest. It does not provision infrastructure or change the corpus. A failed update
 leaves `ready=false` and can be retried. Then run `python scripts/lab.py smoke`.

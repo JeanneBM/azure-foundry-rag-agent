@@ -28,7 +28,7 @@ Fill in the project endpoint, KB MCP endpoint and RemoteTool connection name. Mo
 
 Set `AZURE_CREDENTIAL_MODE=cli` for explicit Azure CLI authentication, `managed_identity` for an Azure runtime, or `default` for the noninteractive Entra credential chain. For a user-assigned runtime identity, set `MANAGED_IDENTITY_CLIENT_ID`. In CLI mode, optionally set `AZURE_CLI_SUBSCRIPTION` to scope token requests without changing the global `az` default.
 
-The example MCP endpoint uses preview API `2026-08-01-preview`. The lab uses GA `2026-04-01` separately for index and knowledge-base provisioning. Use your actual Azure-provided endpoint if it requires another version. Assess preview features separately before production use. The grounding parser accepts nonempty `content` records with `ref_id`, directly or wrapped in MCP `content[].text` or `result.content[].text`. Unknown schemas are rejected.
+The example MCP endpoint uses preview API `2026-08-01-preview`. The lab uses GA `2026-04-01` for index/source provisioning and preview `2026-08-01-preview` for the knowledge base, explicitly set to `minimal` reasoning and `extractiveData` without a KB model. Use your actual Azure-provided endpoint if it requires another version. Assess preview features separately before production use. The grounding parser accepts nonempty `content` records with `ref_id`, directly or wrapped in MCP `content[].text` or `result.content[].text`. Unknown schemas are rejected.
 
 | Setting | Default / purpose |
 |---|---|

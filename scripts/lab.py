@@ -26,6 +26,22 @@ MCP_API = "2026-08-01-preview"
 CONNECTION_API = "2025-10-01-preview"
 
 
+def configure_demo_kb(state, endpoint):
+    # Preview defaults to low reasoning, which requires a KB model. This lab
+    # deliberately uses Search-only retrieval and generates answers in Foundry.
+    request(
+        state,
+        f"{endpoint}/knowledgebases('demo-kb')?api-version={MCP_API}",
+        "PUT",
+        {
+            "name": "demo-kb",
+            "knowledgeSources": [{"name": "demo-source"}],
+            "retrievalReasoningEffort": {"kind": "minimal"},
+            "outputMode": "extractiveData",
+        },
+    )
+
+
 def setup(args):
     # Fail before provisioning if required CLI capabilities are unavailable.
     az("cognitiveservices", "account", "project", "create", "--help")
@@ -216,12 +232,7 @@ def setup(args):
     request(
         state, f"{endpoint}/knowledgesources('demo-source')?api-version={SEARCH_API}", "PUT", source
     )
-    request(
-        state,
-        f"{endpoint}/knowledgebases('demo-kb')?api-version={SEARCH_API}",
-        "PUT",
-        {"name": "demo-kb", "knowledgeSources": [{"name": "demo-source"}]},
-    )
+    configure_demo_kb(state, endpoint)
     mcp = f"{endpoint}/knowledgebases/demo-kb/mcp?api-version={MCP_API}"
     request(
         state,
@@ -285,6 +296,7 @@ def repair_mcp():
     mcp = f"{endpoint}/knowledgebases/demo-kb/mcp?api-version={MCP_API}"
     state["ready"] = False
     save(path, state)
+    configure_demo_kb(state, endpoint)
     request(
         state,
         f"https://management.azure.com{project['id']}/connections/demo-kb-mcp?api-version={CONNECTION_API}",
@@ -311,7 +323,7 @@ def repair_mcp():
         raise LabError("Agent update failed. Retain state and rerun repair-mcp.")
     state["ready"] = True
     save(path, state)
-    print("MCP connection and agent updated. Run python scripts/lab.py smoke.")
+    print("Minimal retrieval, MCP connection and agent updated. Run python scripts/lab.py smoke.")
 
 
 def main():

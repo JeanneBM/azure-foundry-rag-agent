@@ -59,4 +59,6 @@ Lab children acquire CLI tokens for the recorded subscription using
 `AZURE_CLI_SUBSCRIPTION`. They do not call `az account set`.
 Multiple retrieval calls produce `multiple_retrieval_calls`; validation errors are
 not counted as successful abstentions. MCP uses preview `2026-08-01-preview`;
-index and knowledge-base provisioning use GA `2026-04-01`.
+index/source provisioning uses GA `2026-04-01`. The dedicated knowledge base uses
+preview `2026-08-01-preview` with explicit `minimal` reasoning and `extractiveData`
+so retrieval does not require a KB model.

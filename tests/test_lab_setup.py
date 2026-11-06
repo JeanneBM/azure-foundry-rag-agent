@@ -78,6 +78,11 @@ def test_setup_wires_project_identity_search_payloads_and_isolated_manifest(tmp_
     connection = next(item for item in requests if "/connections/" in item[0])
     assert connection[2]["properties"]["target"] == state["environment"]["RAG_MCP_ENDPOINT"]
     assert connection[2]["properties"]["authType"] == "ProjectManagedIdentity"
+    kb = next(item for item in requests if "/knowledgebases('demo-kb')?" in item[0])
+    assert kb[0].endswith("api-version=2026-08-01-preview")
+    assert kb[2]["retrievalReasoningEffort"] == {"kind": "minimal"}
+    assert kb[2]["outputMode"] == "extractiveData"
+    assert "models" not in kb[2]
     assert connection[2]["properties"]["target"].endswith("api-version=2026-08-01-preview")
     assert any("/indexes/demo-docs?api-version=2026-04-01" in item[0] for item in requests)
     assert state["environment"]["DEPLOYMENT_FILE"] == str(tmp_path / ".local/deployment.json")
@@ -99,7 +104,7 @@ def test_setup_wires_project_identity_search_payloads_and_isolated_manifest(tmp_
 
 
 @pytest.mark.parametrize("child_result", [0, 1])
-def test_repair_mcp_updates_only_connection_and_agent(tmp_path, monkeypatch, child_result):
+def test_repair_mcp_updates_kb_connection_and_agent(tmp_path, monkeypatch, child_result):
     scripts = Path(__file__).resolve().parents[1] / "scripts"
     monkeypatch.syspath_prepend(str(scripts))
     spec = importlib.util.spec_from_file_location("rag_lab_repair", scripts / "lab.py")
@@ -139,9 +144,13 @@ def test_repair_mcp_updates_only_connection_and_agent(tmp_path, monkeypatch, chi
             module.repair_mcp()
     else:
         module.repair_mcp()
-    assert len(calls) == len(requests) == 1
-    assert "/connections/demo-kb-mcp?" in requests[0][1]
-    target = requests[0][3]["properties"]["target"]
+    assert len(calls) == 1 and len(requests) == 2
+    assert "/knowledgebases('demo-kb')?" in requests[0][1]
+    assert requests[0][3]["retrievalReasoningEffort"] == {"kind": "minimal"}
+    assert requests[0][3]["outputMode"] == "extractiveData"
+    assert "models" not in requests[0][3]
+    assert "/connections/demo-kb-mcp?" in requests[1][1]
+    target = requests[1][3]["properties"]["target"]
     assert target.endswith("/knowledgebases/demo-kb/mcp?api-version=2026-08-01-preview")
     assert state["environment"]["RAG_MCP_ENDPOINT"] == target
     assert state["environment"]["AGENT_VERSION"] == ""
