@@ -33,11 +33,7 @@ def test_real_sdk_serializes_pinned_agent_and_guarded_answer(settings):
     assert answer.sources[0]["ref_id"] == "0"
     assert requests[0]["agent_reference"]["version"] == "2"
     assert requests[0]["store"] is False
-    assert requests[0]["tool_choice"] == {
-        "type": "mcp",
-        "server_label": "KnowledgeBase",
-        "name": "knowledge_base_retrieve",
-    }
+    assert "tool_choice" not in requests[0]
 
 
 def test_rejected_answer_never_enters_history(settings):
