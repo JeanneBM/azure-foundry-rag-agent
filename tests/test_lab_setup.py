@@ -84,4 +84,11 @@ def test_setup_wires_project_identity_search_payloads_and_isolated_manifest(tmp_
         for cmd in calls
         if cmd[:3] == ("search", "service", "create") and "--help" not in cmd
     )
+    search_create = next(
+        cmd for cmd in calls if cmd[:3] == ("search", "service", "create") and "--help" not in cmd
+    )
+    assert search_create[search_create.index("--auth-options") + 1] == "aadOrApiKey"
+    assert search_create[search_create.index("--aad-auth-failure-mode") + 1] == (
+        "http401WithBearerChallenge"
+    )
     assert json.loads(path.read_text())["ready"]
