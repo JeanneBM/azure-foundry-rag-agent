@@ -13,6 +13,11 @@ RETRIEVE_TOOL = "knowledge_base_retrieve"
 UNKNOWN_ANSWER = "I don't know"
 
 INSTRUCTIONS = """Answer in the user's language using only the connected knowledge base.
+Answer only questions about topics explicitly covered in the attached knowledge-base documents.
+Every factual statement must be supported by the documents retrieved for the current question.
+If the topic is absent from those documents, respond exactly: I don't know
+Do not answer out-of-scope questions from pretrained knowledge, even for common definitions.
+Do not invent a description of the knowledge base or claim it contains documents not retrieved.
 Call knowledge_base_retrieve exactly once per response, including follow-ups.
 Submit the complete question in that single call; do not split it into multiple tool calls.
 When retrieval options are exposed, use minimal reasoning and extractiveData output.
