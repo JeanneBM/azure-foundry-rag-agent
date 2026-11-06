@@ -96,10 +96,10 @@ def test_setup_wires_project_identity_search_payloads_and_isolated_manifest(tmp_
     search_create = next(
         cmd for cmd in calls if cmd[:3] == ("search", "service", "create") and "--help" not in cmd
     )
-    assert search_create[search_create.index("--auth-options") + 1] == "aadOrApiKey"
-    assert search_create[search_create.index("--aad-auth-failure-mode") + 1] == (
-        "http401WithBearerChallenge"
-    )
+    # Entra ID only: keys disabled, and no auth option that would re-enable them.
+    assert "--disable-local-auth" in search_create
+    assert "--auth-options" not in search_create
+    assert "--aad-auth-failure-mode" not in search_create
     assert json.loads(path.read_text())["ready"]
 
 
