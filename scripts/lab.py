@@ -305,7 +305,9 @@ def repair_mcp():
     state["environment"]["RAG_MCP_ENDPOINT"] = mcp
     state["environment"]["AGENT_VERSION"] = ""
     save(path, state)
-    if child(ROOT, state, ["create_rag_agent.py"]):
+    # The connection is configured, but persisted readiness stays false until
+    # agent deployment succeeds. Allow only this deployment child to proceed.
+    if child(ROOT, {**state, "ready": True}, ["create_rag_agent.py"]):
         raise LabError("Agent update failed. Retain state and rerun repair-mcp.")
     state["ready"] = True
     save(path, state)
