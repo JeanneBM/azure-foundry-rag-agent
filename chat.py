@@ -55,9 +55,18 @@ def main() -> int:
                 print_answer(session.ask(args.question), as_json=args.json)
                 return 0
             print(f"Document Q&A Assistant — {settings.agent_name}, version {version}")
-            print("I answer questions using only the connected knowledge-base documents.")
-            print("All answers are in English and supported facts include source citations.")
-            print("If the documents do not support an answer, I respond: I don't know")
+            if settings.agent_name == "RagDemo":
+                print(
+                    "Welcome! I answer questions about product returns and support hours "
+                    "using the attached demo documents. I provide source citations and "
+                    "do not answer questions outside the knowledge base."
+                )
+            else:
+                print(
+                    "Welcome! I answer questions using the connected knowledge-base documents. "
+                    "I provide source citations and do not answer questions outside "
+                    "the knowledge base."
+                )
             print("Type exit to close this chat.\n")
             while True:
                 try:
