@@ -6,8 +6,24 @@ import json
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from lab_validation import Outcome, Unavailable, azure, execute, selected_environment
+
+# Must match the return-policy record in examples/lab-documents.json.
+RETURNS_DOCUMENT_ID = "returns"
+RETURNS_DOCUMENT_TITLE = "Demo return policy"
+
+
+def cites_document(sources, document_id, title):
+    """True when a cited source is the expected index document, by URL key or by title."""
+    for source in sources:
+        url = source.get("url")
+        if isinstance(url, str) and urlsplit(url).path.endswith(f"/docs/{document_id}"):
+            return True
+        if source.get("title") == title:
+            return True
+    return False
 
 
 class CloudLab:
@@ -135,6 +151,9 @@ class CloudLab:
             checks = {
                 "knownAnswer": not known.unknown and "30 days" in known.text.casefold(),
                 "knownCitations": bool(known.sources),
+                "knownCitesReturnPolicy": cites_document(
+                    known.sources, RETURNS_DOCUMENT_ID, RETURNS_DOCUMENT_TITLE
+                ),
                 "unknownAbstention": unknown.unknown,
             }
             (directory / "smoke.json").write_text(

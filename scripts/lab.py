@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SEARCH_API = "2026-04-01"
 MCP_API = "2026-08-01-preview"
 CONNECTION_API = "2025-10-01-preview"
+AZURE_AI_USER_ROLE_ID = "53ca6127-db72-4b80-b1b0-d745d6d5456d"
 
 
 def configure_demo_kb(state, endpoint):
@@ -182,7 +183,8 @@ def setup(args):
             "Signed-in token has no object ID. Use an Azure CLI user or service principal login."
         )
     kind = "ServicePrincipal" if claims.get("idtyp") == "app" else "User"
-    grant(state, user, "53ca6127-db72-4b80-b1b0-d745d6d5456d", account["id"], kind)
+    # Built-in "Azure AI User" (shown as Foundry User). The role ID is stable across the rename.
+    grant(state, user, AZURE_AI_USER_ROLE_ID, account["id"], kind)
     grant(state, user, "Search Service Contributor", search["id"], kind)
     grant(state, user, "Search Index Data Contributor", search["id"], kind)
     grant(state, principal, "Search Index Data Reader", search["id"])
