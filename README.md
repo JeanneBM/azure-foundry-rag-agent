@@ -1,5 +1,8 @@
 # Azure Foundry RAG Agent
 
+[![Tests](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/ci.yml)
+[![Security — CodeQL](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/security.yml)
+
 A Python application for answering questions from an Azure AI Search knowledge base
 through a versioned Microsoft Foundry agent and MCP. It includes a guarded terminal
 client, a disposable Azure demo lab and automated offline tests.
@@ -160,6 +163,8 @@ python -m pytest -q
 Tests cover SDK serialization, version reuse, both MCP envelopes, citation rejection,
 subscription isolation, telemetry and lab lifecycle/reporting. CI makes no live Azure
 calls; [GitHub Actions](GITHUB_ACTIONS.md) documents its scope.
+A separate CodeQL workflow scans Python on pushes, pull requests and weekly.
+The badges above show workflow results on `main`; they do not certify the absence of vulnerabilities.
 
 Azure setup and manual playground retrieval/refusal were exercised during development.
 A successful playground answer does not establish a passing guarded CLI smoke test.
