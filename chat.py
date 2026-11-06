@@ -54,7 +54,11 @@ def main() -> int:
             if args.question is not None:
                 print_answer(session.ask(args.question), as_json=args.json)
                 return 0
-            print(f"Agent: {settings.agent_name}, version {version}. Type exit to quit.")
+            print(f"Document Q&A Assistant — {settings.agent_name}, version {version}")
+            print("I answer questions using only the connected knowledge-base documents.")
+            print("All answers are in English and supported facts include source citations.")
+            print("If the documents do not support an answer, I respond: I don't know")
+            print("Type exit to close this chat.\n")
             while True:
                 try:
                     question = input("You: ").strip()
