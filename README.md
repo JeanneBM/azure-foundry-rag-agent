@@ -1,243 +1,198 @@
 # Azure Foundry RAG Agent
 
-A RAG agent on Microsoft Foundry Agent Service that uses an Azure AI Search Knowledge Base through MCP. This repository deploys an **agent version** and provides a terminal client. Use the dedicated demo lab below, or prepare your own knowledge base, indexes, model and RemoteTool connection.
+A Python application for answering questions from an Azure AI Search knowledge base
+through a versioned Microsoft Foundry agent and MCP. It includes a guarded terminal
+client, a disposable Azure demo lab and automated offline tests.
 
-The client forces a `knowledge_base_retrieve` call and validates the result before displaying the answer. Factual answers must cite identifiers actually returned by the current retrieval. These checks establish source provenance, but do not prove that every sentence follows from the documents. Retrieval quality and answer faithfulness require evaluation on your target data.
+The included **RagDemo** assistant covers **product returns and support hours**.
+Answers are configured to be in English, cite retrieved sources and refuse questions
+outside the connected documents. This is a document Q&A demo, not a general assistant.
 
-[Quick-start guide](docs/quickstart.md) · [Offline GitHub Actions](GITHUB_ACTIONS.md)
+[Use your own knowledge base](docs/quickstart.md) · [Lab reports](docs/lab-validation.md)
+· [Troubleshooting](docs/troubleshooting.md) · [GitHub Actions](GITHUB_ACTIONS.md)
 
-## Individual lab reports
+## Demo knowledge base
 
-Use `python scripts/validate_lab.py smoke` for this repository's existing lab.
-For setup, smoke, verified deletion, recreation and another smoke/delete,
-use the explicit `cycle` command in the [lab validation guide](docs/lab-validation.md).
-Each run writes its own JSON/Markdown report under `.local/reports/`.
-Verdicts and exit codes: PASS (0), FAIL (1), INCONCLUSIVE (2).
-No combined report across repositories is produced.
+The lab indexes two synthetic documents from [examples/lab-documents.json](examples/lab-documents.json).
 
-## Dedicated demo lab: setup → smoke → run → delete
+| Document | Information available |
+| --- | --- |
+| Demo return policy | Products can be returned within **30 days after delivery**. |
+| Demo support hours | Support is open **Monday–Friday, 09:00–17:00 UTC**. No personal contact details are included. |
 
-Use Python 3.12 and a current Azure CLI (2.80+ with Search `--knowledge-retrieval` support),
-with permissions to create resources and assign resource-scoped roles. Install the
-locked runtime dependencies in a virtual environment as shown below, then run
-these commands from the repository root, one at a time:
+Try `What is the product return period?`, `What are the support hours?` and
+`What is Kubernetes?`. The last question is outside the demo corpus and should
+produce exactly `I don't know`. A validation error is a failed request, not a refusal.
+The interactive terminal displays an introduction with the demo's scope.
 
-```sh
-az login
-python scripts/lab.py setup --subscription '<YOUR_SUBSCRIPTION_ID>'
-python scripts/lab.py check
-python scripts/lab.py smoke
-python scripts/lab.py run
-python scripts/lab.py delete
-```
+## How it works
 
-`exit` ends the chat client. **Delete ends the Azure lab:** it waits for deletion
-and verifies the recorded resource group is absent. Noninteractive cleanup is
-`python scripts/lab.py delete --confirm rg-foundry-rag-demo`.
+1. The pinned Foundry agent calls `knowledge_base_retrieve` on the connected Search KB.
+2. The KB returns matching document content. The demo uses text search with semantic
+   ranking, `minimal` reasoning and `extractiveData`; it has no retrieval LLM,
+   embedding deployment, vector fields or custom chunking pipeline.
+3. The Foundry model generates the answer. Its instructions restrict responses to
+   evidence in the documents and require source citations.
+4. Before displaying the answer, the Python client verifies retrieval completion and
+   citation provenance. Only accepted turns enter the bounded local chat history.
 
-Setup creates a dedicated Foundry account/project, `gpt-4.1-mini`, one Basic Search
-service, a text index with synthetic documents, a Knowledge Base and a
-project-managed-identity RemoteTool connection. It creates/reuses the agent
-version and isolates its manifest in `.local/deployment.json`. It saves generation
-and subscription state before provisioning, refuses unrelated groups, resumes
-partial setup and chooses fresh resource names after deletion. Keep `.local/`
-until cleanup completes. Existing RAG resources are not adopted or deleted.
+The agent definition forces the retrieval tool; response requests inherit that setting.
+The client requires exactly one retrieval call per answer because reference IDs are
+scoped to a call. It supports `ref_id` records and the observed `documents`/`id`
+envelope, including JSON-encoded MCP text wrappers.
 
-**Basic Search has ongoing charges while provisioned**, even when the chat is
-closed. Model inference is metered. Semantic search and knowledge retrieval use
-the free allowance; exhaustion can fail requests. This lab uses public endpoints
-and synthetic data only; it is not a production deployment. Search definitions
-use `2026-04-01` for the index/source; the knowledge base and MCP endpoint use `2026-08-01-preview` and the RemoteTool connection management API is preview
-(`2025-10-01-preview`). This new provisioning path is validated offline, with
-**live Azure setup and the known/unknown smoke test still required**.
+Citations can use `[ref_id:X]` with an actual returned ID or native `url_citation`
+annotations. A native URL must match exactly one document from the same retrieval,
+with valid text offsets. Unknown IDs, invented URLs, ambiguous matches, malformed
+results and uncited factual answers are rejected. Citation URLs are never fetched
+by the validator.
 
-Use `--group`, `--location`, `--model`, `--model-version` or `--capacity` on setup to
-change defaults before the first run. Reuse the same parameters when resuming.
-`check` verifies recorded group ownership and setup state, not model/retrieval
-health. If setup fails, retain state and rerun it or use `delete`; there is no
-silent rollback of resources. Soft-deleted Cognitive Services accounts remain
-recoverable and are not purged. No AKS, Network Watcher or external resource group
-is created by this lab.
+**These checks establish provenance, not whether every claim follows from its source.**
+The language and topic rules are model instructions, not deterministic guarantees.
+The Foundry playground is useful for manual exploration but bypasses this client's
+validation and does not display its terminal introduction.
 
-## Requirements and scope
+## Run the dedicated demo lab
 
-- Python **3.12**: the dependency locks and CI target this version.
-- A Foundry project with a deployed model supporting the Responses API and MCP.
-- Azure AI Search with a ready Knowledge Base and completed indexing.
-- A Foundry RemoteTool connection pointing to the exact MCP endpoint.
-- Azure CLI for local authentication, or Managed Identity in an Azure runtime.
-
-This is a managed Foundry agent deployment and a CLI client. The optional demo lab provisions isolated infrastructure and indexes synthetic documents; the application does not expose a public HTTP API. Response validation is implemented by this repository's client; calling the agent through another client bypasses these checks.
-
-## Prepare Azure
-
-1. Prepare a Knowledge Base containing the content your users should be able to access. In the portal, verify that retrieval returns chunks and `ref_id` identifiers.
-2. Deploy your chosen model in the Foundry project. `MODEL_DEPLOYMENT` is the **deployment name**, not the model's catalog name.
-3. Create a RemoteTool connection to the Knowledge Base endpoint. For Managed Identity authentication, set the audience to `https://search.azure.com/` and grant the identity used by the connection the **Search Index Data Reader** role on the Search service. Verify the actual identity in the connection settings.
-4. Grant the deployment identity permissions to manage project agents and invoke the model, for example **Foundry User** (formerly Azure AI User) on the appropriate Foundry resource, according to your organization's RBAC policy. Limit the scope to the required resource.
-5. Ensure network connectivity for both client → Foundry and Foundry → Search. For private endpoints, use an appropriately connected runtime.
-
-All users of this client share the KB connection's permissions. There is no user identity passthrough or separate document ACL enforcement. The knowledge base and its connection must be intended for a shared, authorized audience.
-
-## Installation
+Prerequisites: Python **3.12**, Azure CLI with Foundry project creation and Search
+`--knowledge-retrieval` support, and Azure permissions to create resources and assign
+resource-scoped roles. The live session used Azure CLI 2.91.0.
 
 ```bash
 git clone https://github.com/JeanneBM/azure-foundry-rag-agent.git
 cd azure-foundry-rag-agent
 python -m venv .venv
-source .venv/bin/activate
-# Windows PowerShell: .venv\Scripts\Activate.ps1
+```
+
+Activate the environment using the command for your shell:
+
+| Shell | Command |
+| --- | --- |
+| Linux/macOS Bash | `source .venv/bin/activate` |
+| Windows Git Bash | `source .venv/Scripts/activate` |
+| Windows PowerShell | `.venv\Scripts\Activate.ps1` |
+
+```bash
 python -m pip install --require-hashes -r requirements.txt
 python -m pip check
-cp .env.example .env
 az login
+python scripts/lab.py setup --subscription '<SUBSCRIPTION_ID>' --location swedencentral
+python scripts/lab.py check
+python scripts/lab.py smoke
+python scripts/lab.py run
 ```
 
-Fill in `.env` with your actual values. Do not include tokens or keys in endpoint URLs. Existing process environment variables take precedence over `.env`.
+Run setup and checks one at a time; inspect any failure before continuing.
+The dedicated lab loads its recorded configuration from `.local/`; it does not need
+a manually configured `.env`. For an existing KB, follow the separate
+[quickstart](docs/quickstart.md).
 
-| Variable | Purpose |
-|---|---|
-| `PROJECT_ENDPOINT` | HTTPS project endpoint ending in `/api/projects/<project>` |
-| `RAG_MCP_ENDPOINT` | Exact KB endpoint: `/knowledgebases/<kb>/mcp?api-version=...` |
-| `PROJECT_CONNECTION_NAME` | Name of the existing RemoteTool connection |
-| `MODEL_DEPLOYMENT` | Model deployment name; defaults to `gpt-4.1-mini` |
-| `AGENT_NAME` | Agent name; defaults to `RagAgent` |
-| `AGENT_VERSION` | Explicit tested version for the client; reads the manifest when unset |
-| `DEPLOYMENT_FILE` | Release manifest; defaults to `deployment.json` |
-| `AZURE_CREDENTIAL_MODE` | `default`, `cli` or `managed_identity` |
-| `AZURE_CLI_SUBSCRIPTION` | Optional subscription for CLI token requests; does not change the global Azure CLI default |
-| `MANAGED_IDENTITY_CLIENT_ID` | Optional client ID of a user-assigned identity |
-| `REQUEST_TIMEOUT_SECONDS` | Timeout for a single request attempt; defaults to 120 seconds |
-| `MAX_OUTPUT_TOKENS` | Generated response limit; defaults to 2048 |
-| `MAX_QUESTION_CHARS` | Question length limit; defaults to 8000 characters |
-| `HISTORY_TURNS` | Retained question/answer pairs; defaults to 6; 0 disables history |
+Setup provisions a dedicated Foundry account/project, `gpt-4.1-mini`, a Basic Search
+service with one replica/partition, an index, two documents, a knowledge source,
+a knowledge base and a project-managed-identity RemoteTool connection. Defaults are
+`rg-foundry-rag-demo` and Sweden Central. Region, group, model, model version and
+capacity can be changed with setup flags **before the first run**; availability and
+quota depend on the subscription. The lab does not deploy AKS or a web application.
 
-The lab uses GA Search API `2026-04-01` for the index and source, and preview
-`2026-08-01-preview` for the knowledge base and MCP endpoint. The knowledge base
-explicitly uses `minimal` reasoning and `extractiveData`: it needs no retrieval
-model; the Foundry agent generates the final answer. Preview defaults to `low`
-when reasoning is omitted, which requires a model on the knowledge base. If your KB configuration requires another version, use the endpoint provided by Azure. Assess preview features separately before production deployment. The parser accepts grounding records with `ref_id` and nonempty `content`, directly or wrapped in MCP `content[].text` / `result.content[].text`. Other formats are rejected.
-
-## Create a version and verify the deployment
+One-shot questions use the same guarded client:
 
 ```bash
-python create_rag_agent.py
+python scripts/lab.py run --question "What are the support hours?"
 ```
 
-The script fingerprints the requested definition and compares it with the latest version’s stored `config_sha256` and `managed_by` metadata. A match reuses the version, even if Foundry adds default fields to the returned definition. Versions without matching metadata are not reused. A changed definition creates a new immutable version. `--force` creates a new version even without changes. The result is written atomically to `deployment.json`.
+Type `exit` to close the interactive chat. **This does not stop Azure billing.**
 
-**The newly created manifest describes a candidate** until it passes checks on Azure. Use two questions tailored to your knowledge base: one with a known answer and one the KB cannot answer.
+## Cost, state and cleanup
+
+Basic Search remains billable while provisioned; model calls are metered.
+Closing the terminal or playground does not delete the lab.
 
 ```bash
-python smoke_test.py \
-  --known-question "What is the product return period?" \
-  --expected-substring "30 days" \
-  --unknown-question "What is the private phone number of a person not mentioned in the documents?"
+python scripts/lab.py delete --confirm rg-foundry-rag-demo
 ```
 
-These questions are examples. The test requires successful retrieval, citations and the expected substring for the first question, and exact `I don't know` for the second. An error exits with code 1; it is not treated as a successful unknown-answer check.
+Deletion waits and verifies that the recorded group is absent. Local reports and state
+are retained. Soft-deleted Cognitive Services accounts are not purged. Keep `.local/`
+until cleanup completes: it records group ownership, subscription and resource names.
+Setup can resume partial provisioning with the same parameters. It refuses to adopt
+an unrelated group and does not silently roll back resources on failure.
 
-After the checks pass, set `AGENT_VERSION` to the version number from the manifest in the client environment. The client never automatically selects `latest`. Precedence: `--version` → `AGENT_VERSION` → a manifest matching the agent name and project endpoint.
+Lab token acquisition is scoped to the recorded subscription without changing the
+operator's global Azure CLI default. Existing resources outside the recorded lab
+are not adopted or deleted.
+
+## Versions and existing environments
+
+`create_rag_agent.py` creates or reuses a version and writes an atomic local manifest.
+Reuse compares the requested definition's fingerprint with the latest version's
+`managed_by` and `config_sha256` metadata; server-added defaults do not create duplicates.
+A changed definition or `--force` creates a candidate version.
+
+Clients resolve `--version` → `AGENT_VERSION` → a matching local manifest, never
+implicitly `latest`. Verify a candidate before moving other clients to it. Roll back
+by selecting a previous verified version. Agent deletion is separate from lab cleanup;
+see the [quickstart](docs/quickstart.md#rollback-and-cleanup).
+
+For updates to the existing demo KB/connection or agent instructions:
 
 ```bash
-python chat.py
-python chat.py --version 2 --question "What is the return period?" --json
+git pull --ff-only
+python scripts/lab.py repair-mcp
+python scripts/lab.py smoke
 ```
 
-The client displays `[ref_id:X]` citations and metadata for the cited sources. It does not invent URLs. If a record has no URL, the client will not display one.
+Repair updates the dedicated demo KB to `minimal`/`extractiveData`, its MCP connection,
+and the agent version/manifest. It does not recreate infrastructure or reindex documents.
+In the playground, select the returned version and start a new conversation.
 
-## Error handling
+## Validation and current evidence
 
-- Missing retrieval, MCP errors, incomplete responses or citations outside the current results cause the model's answer to be rejected.
-- Interactive mode displays a validation-failure message and a separate diagnostic on stderr; this is distinct from a valid unknown answer. `--question` mode exits with code 1 without emitting an unverified answer.
-- Network and RBAC errors are distinguished from a lack of knowledge. Remote error bodies, tokens and document chunks are not printed in diagnostics.
-- Only accepted answers enter local history. Every new question requires exactly one retrieval call. A second call is rejected as `multiple_retrieval_calls` because reference IDs are scoped to one call. The knowledge base can decompose the complete question internally.
-- The Responses API is called with `store=False`; the client does not create persistent Conversations. Configure Azure service retention and monitoring policies separately.
-- Responses calls have at most two SDK retries. The timeout applies to each attempt. Agent management has no automatic retries to avoid duplicate versions after a lost response. After a timeout during creation, inspect the agent's state in Azure first.
-
-## Rollback and deletion
-
-Roll back the client by setting a previous verified `AGENT_VERSION` or passing `--version`. This does not delete any versions in Azure. Retain the previous release manifest.
-
-Creating a new version changes `latest` in Foundry even before the smoke test. All production clients should use explicitly pinned versions; an agent name without a version does not isolate them from the candidate.
-
-```bash
-python delete_rag_agent.py --version 2 --yes
-# Delete the agent and ALL of its versions:
-python delete_rag_agent.py --all --yes
-```
-
-There is no default version to delete. Deletion does not update manifests or client configuration — first move clients to a version you will retain.
-
-## Offline CI and local deployment
-
-Pushes and PRs to `main` run only lint, formatting, offline tests and dependency checks. GitHub Actions has no Azure login, OIDC permission, Azure secrets or deployment job. A manual workflow dispatch runs the same offline checks. See [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
-
-Deploy and verify from your own machine using `az login`, `python create_rag_agent.py` and `python smoke_test.py`. Keep the verified `deployment.json` locally and pin its version in your client configuration.
+Offline verification:
 
 ```bash
 python -m pip install --require-hashes -r requirements-dev.txt
+python -m pip check
 ruff check .
 ruff format --check .
 python -m pytest -q
 ```
 
-Offline tests use actual SDK models/serialization and mock HTTP transports. They cannot confirm RBAC, networking or KB content — `smoke_test.py` checks the live environment.
+Tests cover SDK serialization, version reuse, both MCP envelopes, citation rejection,
+subscription isolation, telemetry and lab lifecycle/reporting. CI makes no live Azure
+calls; [GitHub Actions](GITHUB_ACTIONS.md) documents its scope.
 
-Runtime and development dependencies are separate and locked with hashes. After deliberately changing versions in the `.in` files, regenerate the locks on Python 3.12 and rerun the checks:
+Azure setup and manual playground retrieval/refusal were exercised during development.
+A successful playground answer does not establish a passing guarded CLI smoke test.
+Sanitized evidence of a final CLI smoke PASS and a full delete/recreate cycle is not
+included in this repository. Run `python scripts/lab.py smoke` to record your own
+known-answer/citation and unknown-answer checks under `.local/reports/`.
+Exit codes are **0 PASS**, **1 FAIL**, **2 INCONCLUSIVE**. See the
+[validation guide](docs/lab-validation.md) for the optional two-generation cycle.
 
-```bash
-python -m pip install pip-tools==7.6.1
-pip-compile --generate-hashes --no-emit-index-url --no-emit-trusted-host -o requirements.txt requirements.in
-pip-compile --generate-hashes --no-emit-index-url --no-emit-trusted-host -o requirements-dev.txt requirements-dev.in
-```
+## Boundaries and telemetry
 
-## Service documentation
+The KB connection provides shared document access. There is no per-user ACL passthrough,
+automatic document ingestion, public HTTP API or production-scale evaluation here.
+Use only a KB intended for all authorized users of this client. Requests use
+`store=False` and do not create persistent Conversations; Azure retention is separate.
 
-- [Connect Foundry to a Knowledge Base](https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/foundry-iq-connect)
-- [MCP format and Search API versions](https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve)
-- [AgentReference and the Responses API](https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/aiproject)
-- [Runtime and response storage](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/runtime-components)
+Telemetry is opt-in via `AGENT_TELEMETRY_FILE` (JSONL) or `AGENT_TELEMETRY_STDOUT=1`.
+It records timing, tool names, reference IDs, native citation counts, available token
+usage and outcomes. It excludes questions, answers, retrieved text, tool arguments
+and argument hashes. Metadata is operational data, not anonymous data. No external
+monitoring platform is required.
 
-## Runtime observability
+## API versions and references
 
-Telemetry is optional. Set `AGENT_TELEMETRY_FILE` to an absolute JSONL path for a log collector of your choice; no external monitoring platform is required.
-Each client question emits a real-time run, observed MCP tool names, retrieved and
-cited reference IDs, provider token usage when present and its terminal outcome.
-Observation happens before grounding validation, so rejected answers remain visible.
-Raw questions, answers, retrieved chunks, tool arguments and argument hashes are excluded.
-The file still contains metadata (tool names, reference IDs, timing and token counts).
-Treat it as operational data, not anonymous data. Telemetry is disabled unless explicitly enabled.
+| Contract | Lab API version |
+| --- | --- |
+| Search index and knowledge source | `2026-04-01` |
+| Knowledge base configuration and MCP | `2026-08-01-preview` |
+| RemoteTool connection management | `2025-10-01-preview` |
 
-## Repair an existing lab MCP endpoint
+The KB/MCP and RemoteTool paths use preview APIs. This disposable public-endpoint,
+synthetic-data lab is not a production deployment.
 
-If the MCP server rejects the API version, run `python scripts/lab.py repair-mcp`.
-This verifies recorded group ownership, sets the dedicated demo knowledge base to
-`minimal`/`extractiveData`, updates the existing RemoteTool connection,
-updates the saved endpoint, and creates or reuses an agent version with a new local
-manifest. It does not provision infrastructure or change the corpus. A failed update
-leaves `ready=false` and can be retried. Then run `python scripts/lab.py smoke`.
-Existing clients pinned to an older version retain that version; move them only after
-verifying the candidate. MCP is preview even though the provisioning Search API is GA.
-
-## Response language
-
-All answers must be in English, regardless of question or conversation language.\nInsufficient evidence always uses
-the fixed English sentinel `I don't know`, including for Polish questions; the instructions
-explicitly prohibit translating it. A localized refusal is rejected rather than silently
-accepted. Validation and transport failures are errors, not successful refusals.
-
-
-## MCP response formats
-
-The client accepts the documented `ref_id`/`content` records and the live MCP
-`{"documents": [{"id": "...", "content": "..."}]}` envelope. For the latter,
-citations use the exact outer document ID as `[ref_id:<id>]`, not its array
-position or an ID embedded inside JSON document content. String-encoded JSON
-and MCP text wrappers are decoded with bounded recursion. Unknown or malformed
-formats remain errors. Returned URLs are preserved as metadata and never fetched
-by the validator. This validates provenance, not semantic support of every claim.
-
-## License
-
-MIT
+- [Connect Foundry to a knowledge base](https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/foundry-iq-connect)
+- [Search retrieval and MCP contracts](https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve)
+- [Foundry agent API reference](https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/aiproject)

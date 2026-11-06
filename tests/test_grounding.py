@@ -90,9 +90,15 @@ def test_requires_new_retrieval_even_for_unknown():
 def test_does_not_treat_annotations_as_retrieval_evidence():
     payload = response_payload("Fictional answer")
     payload["output"][1]["content"][0]["annotations"] = [
-        {"type": "url_citation", "url": "https://example.com", "title": "Made up"}
+        {
+            "type": "url_citation",
+            "url": "https://example.com",
+            "title": "Made up",
+            "start_index": 0,
+            "end_index": len("Fictional answer"),
+        }
     ]
-    with pytest.raises(GroundingError, match="missing_citations"):
+    with pytest.raises(GroundingError, match="unknown_citation"):
         validate_response(payload)
 
 

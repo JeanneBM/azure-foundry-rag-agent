@@ -1,8 +1,6 @@
 # Individual lab validation report
 
-This repository produces its **own** report. There is no cross-repository runner
-or combined report. Reports use schema `1.0` and the verdict semantics below. Assertions cover this
-Foundry RAG lab only.
+This repository records checks for the Foundry RAG demo lab using report schema `1.0`.
 
 ## Existing lab: smoke
 
@@ -49,10 +47,10 @@ They survive cleanup and are separate from scenario/evaluation evidence.
 | FAIL | Observed evidence violates an assertion (for example wrong return period, invalid citations, failure to abstain, reused resource names or incomplete cleanup). | 1 |
 | INCONCLUSIVE | Execution, prerequisites, networking or evidence collection prevented a determination; not a pass. | 2 |
 
-A smoke PASS verifies that smoke's limited scenario, not production readiness or
+A smoke PASS verifies only the two requested checks, not production readiness or
 all evaluation scenarios. A report produced during an offline mocked test is
-not live Azure evidence. The new lifecycle must still be run on Azure; no live
-result is implied by the presence of these scripts. Raw logs and SDK/evaluation
+not live Azure evidence. Manual playground results are not a substitute for a recorded CLI smoke or
+full lifecycle result. No live PASS is implied by the presence of these scripts. Raw logs and SDK/evaluation
 evidence remain local and must be reviewed before sharing.
 
 Lab children acquire CLI tokens for the recorded subscription using

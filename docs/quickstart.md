@@ -1,6 +1,6 @@
-# Azure Foundry RAG Agent
+# Connect an existing knowledge base
 
-A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. The application deploys the **agent definition**. An optional [dedicated demo lab](../README.md#dedicated-demo-lab-setup--smoke--run--delete) provisions isolated Azure resources and synthetic documents; no HTTP API is served.
+A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. The application deploys the **agent definition**. An optional [dedicated demo lab](../README.md#run-the-dedicated-demo-lab) provisions isolated Azure resources and synthetic documents; no HTTP API is served.
 
 [Complete documentation](../README.md) · [Offline CI setup](../GITHUB_ACTIONS.md)
 
@@ -17,6 +17,7 @@ The client uses the connection's shared KB access. It does not implement per-use
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+# Windows Git Bash: source .venv/Scripts/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --require-hashes -r requirements.txt
 python -m pip check
@@ -64,7 +65,9 @@ Version precedence is `--version`, then `AGENT_VERSION`, then a manifest matchin
 
 ## Grounding and errors
 
-The pinned agent definition forces the KB retrieval tool. Requests inherit that setting and deliberately omit `tool_choice` to avoid conflicting overrides. Exactly one retrieval call per response is accepted; a second call fails with `multiple_retrieval_calls`. Before displaying a factual answer, the client checks response completion, successful MCP retrieval, nonempty evidence and citation IDs matching the current retrieval results. It displays `[ref_id:X]` citations and source metadata; it does not invent source URLs.
+The pinned agent definition forces the KB retrieval tool. Requests inherit that setting and deliberately omit `tool_choice` to avoid conflicting overrides. Exactly one retrieval call per response is accepted; a second call fails with `multiple_retrieval_calls`. Before displaying a factual answer, the client checks response completion, successful MCP retrieval, nonempty evidence and citation IDs matching the current retrieval results. It accepts `[ref_id:X]` identifiers or native `url_citation` annotations with valid
+text offsets and a unique, exact URL match in the current retrieval results. It
+displays source metadata and does not invent or fetch source URLs.
 
 These are provenance checks, **not proof that every claim follows from the cited evidence**. Evaluate answer accuracy and retrieval quality using representative data. Other clients calling the Foundry agent directly bypass this repository's response checks.
 
@@ -115,6 +118,4 @@ and MCP text wrappers are decoded with bounded recursion. Unknown or malformed
 formats remain errors. Returned URLs are preserved as metadata and never fetched
 by the validator. This validates provenance, not semantic support of every claim.
 
-## License
 
-MIT
