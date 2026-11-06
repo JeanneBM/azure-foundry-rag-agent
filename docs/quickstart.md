@@ -104,6 +104,17 @@ Offline tests exercise actual SDK models and HTTP serialization, but cannot vali
 - [Search MCP output and API versions](https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve)
 - [Foundry Responses API](https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/aiproject)
 
+
+## MCP response formats
+
+The client accepts the documented `ref_id`/`content` records and the live MCP
+`{"documents": [{"id": "...", "content": "..."}]}` envelope. For the latter,
+citations use the exact outer document ID as `[ref_id:<id>]`, not its array
+position or an ID embedded inside JSON document content. String-encoded JSON
+and MCP text wrappers are decoded with bounded recursion. Unknown or malformed
+formats remain errors. Returned URLs are preserved as metadata and never fetched
+by the validator. This validates provenance, not semantic support of every claim.
+
 ## License
 
 MIT

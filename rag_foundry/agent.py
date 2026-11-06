@@ -24,7 +24,10 @@ Exception to the language rule: if evidence is insufficient, always respond exac
 I don't know
 Do not translate this fixed refusal, even when the user asks in Polish or another language.
 For a factual answer, cite each supported claim using [ref_id:X], where X is the exact ref_id
-from a retrieved grounding record. Preserve ref_id values verbatim. Do not invent citations.
+from a retrieved grounding record. If retrieval returns a documents array instead,
+use each document's outer id as X in [ref_id:X], preserving that id verbatim.
+Never use an id found inside a document's content or invent numbered reference IDs.
+Preserve returned ref_id values verbatim. Do not invent citations.
 Use these citation tokens even if native annotations are also available.
 """
 

@@ -44,6 +44,31 @@ def _decode(payload: Any, depth: int = 0) -> list[dict[str, Any]]:
     if isinstance(payload, dict):
         if payload.get("isError"):
             raise GroundingError("retrieval_failed")
+        if "documents" in payload:
+            documents = payload["documents"]
+            if not isinstance(documents, list):
+                raise GroundingError("invalid_grounding_record")
+            records = []
+            for document in documents:
+                if not isinstance(document, dict):
+                    raise GroundingError("invalid_grounding_record")
+                ref_id = document.get("id")
+                content = document.get("content")
+                if (
+                    not isinstance(ref_id, str)
+                    or not REFERENCE_ID.fullmatch(ref_id)
+                    or not isinstance(content, str)
+                    or not content.strip()
+                ):
+                    raise GroundingError("invalid_grounding_record")
+                # Use the actual outer MCP ID, never an index position or an ID
+                # embedded in the document content. Do not fetch citation URLs.
+                record = {"ref_id": ref_id, "id": ref_id, "content": content}
+                for key in ("title", "url", "knowledgeSourceIndex"):
+                    if key in document:
+                        record[key] = document[key]
+                records.append(record)
+            return records
         if "result" in payload:
             return _decode(payload["result"], depth + 1)
         if isinstance(payload.get("content"), list):
