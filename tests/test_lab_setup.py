@@ -6,6 +6,8 @@ import json
 from argparse import Namespace
 from pathlib import Path
 
+import pytest
+
 
 def test_setup_wires_project_identity_search_payloads_and_isolated_manifest(tmp_path, monkeypatch):
     scripts = Path(__file__).resolve().parents[1] / "scripts"
@@ -76,6 +78,8 @@ def test_setup_wires_project_identity_search_payloads_and_isolated_manifest(tmp_
     connection = next(item for item in requests if "/connections/" in item[0])
     assert connection[2]["properties"]["target"] == state["environment"]["RAG_MCP_ENDPOINT"]
     assert connection[2]["properties"]["authType"] == "ProjectManagedIdentity"
+    assert connection[2]["properties"]["target"].endswith("api-version=2026-08-01-preview")
+    assert any("/indexes/demo-docs?api-version=2026-04-01" in item[0] for item in requests)
     assert state["environment"]["DEPLOYMENT_FILE"] == str(tmp_path / ".local/deployment.json")
     assert state["environment"]["AGENT_VERSION"] == ""
     assert children[0][2] == ["create_rag_agent.py"]
@@ -92,3 +96,46 @@ def test_setup_wires_project_identity_search_payloads_and_isolated_manifest(tmp_
         "http401WithBearerChallenge"
     )
     assert json.loads(path.read_text())["ready"]
+
+
+@pytest.mark.parametrize("child_result", [0, 1])
+def test_repair_mcp_updates_only_connection_and_agent(tmp_path, monkeypatch, child_result):
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    monkeypatch.syspath_prepend(str(scripts))
+    spec = importlib.util.spec_from_file_location("rag_lab_repair", scripts / "lab.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    path = tmp_path / ".local/lab.json"
+    state = {
+        "subscriptionId": "sub",
+        "resourceGroup": "rg-demo",
+        "accountName": "foundry-demo",
+        "generation": "a" * 32,
+        "ready": True,
+        "environment": {"RAG_MCP_ENDPOINT": "old", "AGENT_VERSION": "1"},
+    }
+    calls, requests = [], []
+    monkeypatch.setattr(module, "load", lambda _: (path, state))
+    monkeypatch.setattr(module, "owned_group", lambda _: None)
+
+    def az(*args, **kwargs):
+        calls.append(args)
+        assert args[:4] == ("cognitiveservices", "account", "project", "show")
+        return {"id": "/project"}
+
+    monkeypatch.setattr(module, "az", az)
+    monkeypatch.setattr(module, "request", lambda *args, **kwargs: requests.append(args))
+    monkeypatch.setattr(module, "child", lambda *args: child_result)
+    if child_result:
+        with pytest.raises(module.LabError, match="Agent update failed"):
+            module.repair_mcp()
+    else:
+        module.repair_mcp()
+    assert len(calls) == len(requests) == 1
+    assert "/connections/demo-kb-mcp?" in requests[0][1]
+    target = requests[0][3]["properties"]["target"]
+    assert target.endswith("/knowledgebases/demo-kb/mcp?api-version=2026-08-01-preview")
+    assert state["environment"]["RAG_MCP_ENDPOINT"] == target
+    assert state["environment"]["AGENT_VERSION"] == ""
+    assert json.loads(path.read_text())["ready"] is (child_result == 0)
