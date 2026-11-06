@@ -1,7 +1,7 @@
 # Azure Foundry RAG Agent
 
-[![Tests](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/ci.yml)
-[![Security — CodeQL](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/security.yml)
+[![Tests](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/ci.yml/badge.svg?branch=main&v=2)](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/ci.yml)
+[![Security — CodeQL](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/security.yml/badge.svg?branch=main&v=2)](https://github.com/JeanneBM/azure-foundry-rag-agent/actions/workflows/security.yml)
 
 A Python application for answering questions from an Azure AI Search knowledge base
 through a versioned Microsoft Foundry agent and MCP. It includes a guarded terminal
