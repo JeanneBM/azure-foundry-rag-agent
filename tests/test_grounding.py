@@ -131,3 +131,15 @@ def test_unexpected_tool_output_rejected():
     payload["output"].insert(0, {"type": "web_search_call"})
     with pytest.raises(GroundingError, match="unexpected_output_item"):
         validate_response(payload)
+
+
+@pytest.mark.parametrize(
+    "records",
+    [[{"ref_id": "0", "content": "90 days"}], [{"ref_id": "1", "content": "Other evidence"}], []],
+)
+def test_second_retrieval_is_rejected_even_without_reference_collision(records):
+    payload = response_payload()
+    second = {**payload["output"][0], "id": "mcp_second", "output": json.dumps(records)}
+    payload["output"].insert(1, second)
+    with pytest.raises(GroundingError, match="multiple_retrieval_calls"):
+        validate_response(payload)

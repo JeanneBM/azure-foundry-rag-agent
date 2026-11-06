@@ -28,7 +28,7 @@ def test_rag_smoke_checks_known_answer_citations_and_abstention(
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    adapter = module.CloudLab(tmp_path, "rag", "rg-demo", "rag")
+    adapter = module.CloudLab(tmp_path, "rag", "rg-demo")
     import rag_foundry.clients
     import rag_foundry.config
     import rag_foundry.deployment

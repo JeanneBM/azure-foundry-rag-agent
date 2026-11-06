@@ -119,6 +119,8 @@ def test_run_uses_recorded_configuration_and_does_not_spawn_for_partial_setup(
     assert lab.child(tmp_path, state, ["chat.py"]) == 0
     assert calls[0][1]["env"]["PROJECT_ENDPOINT"] == "recorded"
     assert calls[0][1]["env"]["AZURE_OPENAI_API_KEY"] == ""
+    assert calls[0][1]["env"]["AZURE_CLI_SUBSCRIPTION"] == "sub"
+    assert not any(args[:2] == ("account", "set") for args, _ in azure.calls)
 
 
 def test_changed_parameters_refuse_existing_lab(tmp_path, azure):

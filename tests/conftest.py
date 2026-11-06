@@ -17,6 +17,7 @@ def settings(monkeypatch, tmp_path):
         "AGENT_VERSION",
         "DEPLOYMENT_FILE",
         "AZURE_CREDENTIAL_MODE",
+        "AZURE_CLI_SUBSCRIPTION",
         "MANAGED_IDENTITY_CLIENT_ID",
         "REQUEST_TIMEOUT_SECONDS",
         "MAX_OUTPUT_TOKENS",
@@ -29,7 +30,7 @@ def settings(monkeypatch, tmp_path):
     )
     monkeypatch.setenv(
         "RAG_MCP_ENDPOINT",
-        "https://example.search.windows.net/knowledgebases/docs/mcp?api-version=2026-04-01",
+        "https://example.search.windows.net/knowledgebases/docs/mcp?api-version=2026-08-01-preview",
     )
     monkeypatch.setenv("PROJECT_CONNECTION_NAME", "kb-connection")
     return Settings.from_env(deployment=True)

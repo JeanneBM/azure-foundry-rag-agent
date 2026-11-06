@@ -5,14 +5,20 @@ from unittest.mock import Mock
 import pytest
 from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 
-from rag_foundry.agent import definition, deploy
+from rag_foundry.agent import definition, deploy, fingerprint
 from rag_foundry.config import ConfigError
 from rag_foundry.deployment import resolve_version, write_manifest
 
 
 def agent(settings, version="2"):
     return SimpleNamespace(
-        name=settings.agent_name, version=version, definition=definition(settings)
+        name=settings.agent_name,
+        version=version,
+        definition=definition(settings),
+        metadata={
+            "managed_by": "azure-foundry-rag-agent",
+            "config_sha256": fingerprint(definition(settings)),
+        },
     )
 
 
@@ -40,6 +46,7 @@ def test_changed_definition_creates_new_version(settings):
     project = Mock()
     current = agent(settings)
     current.definition.model = "previous-model"
+    current.metadata["config_sha256"] = fingerprint(current.definition)
     project.agents.get.return_value.versions.latest = current
     project.agents.create_version.return_value = agent(settings, "3")
     assert deploy(project, settings)[1]

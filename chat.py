@@ -68,7 +68,7 @@ def main() -> int:
                 try:
                     print_answer(session.ask(question))
                 except GroundingError as exc:
-                    print("\nAgent: I don't know\n")
+                    print("\nAnswer unavailable: response validation failed.\n")
                     report_error(exc)
                 except (ConfigError, AzureError, APIError) as exc:
                     report_error(exc)

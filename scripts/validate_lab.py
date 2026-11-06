@@ -7,7 +7,7 @@ from lab_validation import main
 
 ROOT = Path(__file__).resolve().parents[1]
 
-ADAPTER = CloudLab(ROOT, "azure-foundry-rag-agent", "rg-foundry-rag-demo", "rag")
+ADAPTER = CloudLab(ROOT, "azure-foundry-rag-agent", "rg-foundry-rag-demo")
 
 if __name__ == "__main__":
     raise SystemExit(main(ADAPTER))

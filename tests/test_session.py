@@ -79,3 +79,13 @@ def test_invalid_question_is_rejected_before_api_request(settings, question):
     with pytest.raises(ConfigError):
         RagSession(client, settings, "2").ask(question)
     client.responses.create.assert_not_called()
+
+
+def test_polish_question_accepts_fixed_english_unknown(settings):
+    from tests.conftest import response_payload
+
+    client = Mock()
+    client.responses.create.return_value = response_payload("I don't know", [])
+    answer = RagSession(client, settings, "2").ask("Jakie są nieudokumentowane zasady?")
+    assert answer.unknown
+    assert client.responses.create.call_args.kwargs["input"][-1]["content"].startswith("Jakie")

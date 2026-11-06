@@ -82,7 +82,8 @@ def selected_environment(state):
     env = os.environ.copy()
     env.update(state["environment"])
     env["AZURE_OPENAI_API_KEY"] = ""
-    azure("account", "set", subscription=state["subscriptionId"])
+    env["AZURE_CREDENTIAL_MODE"] = "cli"
+    env["AZURE_CLI_SUBSCRIPTION"] = state["subscriptionId"]
     return env
 
 
