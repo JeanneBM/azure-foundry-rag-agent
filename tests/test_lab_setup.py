@@ -155,3 +155,36 @@ def test_repair_mcp_updates_kb_connection_and_agent(tmp_path, monkeypatch, child
     assert state["environment"]["RAG_MCP_ENDPOINT"] == target
     assert state["environment"]["AGENT_VERSION"] == ""
     assert json.loads(path.read_text())["ready"] is (child_result == 0)
+
+
+def test_run_passes_demo_welcome_without_persisting_it(tmp_path, monkeypatch):
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    monkeypatch.syspath_prepend(str(scripts))
+    spec = importlib.util.spec_from_file_location("rag_lab_run", scripts / "lab.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    state = {"ready": True, "environment": {"AGENT_NAME": "RagDemo"}}
+    children = []
+    monkeypatch.setattr(module, "load", lambda _: (tmp_path / ".local/lab.json", state))
+    monkeypatch.setattr(module, "child", lambda *args: children.append(args) or 0)
+    monkeypatch.setattr(module.sys, "argv", ["lab.py", "run", "--question", "Q"])
+    assert module.main() == 0
+    _, child_state, args = children[0]
+    assert child_state["environment"]["CHAT_WELCOME"] == module.DEMO_WELCOME
+    assert args == ["chat.py", "--question", "Q"]
+    assert "CHAT_WELCOME" not in state["environment"]
+
+
+def test_run_with_partial_setup_reports_incomplete_setup(tmp_path, monkeypatch):
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    monkeypatch.syspath_prepend(str(scripts))
+    spec = importlib.util.spec_from_file_location("rag_lab_partial_run", scripts / "lab.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    state = {"ready": False}
+    monkeypatch.setattr(module, "load", lambda _: (tmp_path / ".local/lab.json", state))
+    # child() lives in lab_support and checks ownership there before readiness.
+    monkeypatch.setattr(module.sys.modules["lab_support"], "owned_group", lambda _: None)
+    monkeypatch.setattr(module.sys, "argv", ["lab.py", "run"])
+    with pytest.raises(module.LabError, match="Setup is incomplete"):
+        module.main()

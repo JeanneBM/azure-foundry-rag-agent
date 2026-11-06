@@ -15,11 +15,23 @@ from rag_foundry.agent import RETRIEVE_TOOL, SERVER_LABEL, UNKNOWN_ANSWER
 
 CITATION = re.compile(r"\[ref_id:([A-Za-z0-9_.-]+)\]")
 REFERENCE_ID = re.compile(r"[A-Za-z0-9_.-]+")
+REASON_CODE = re.compile(r"[a-z0-9_]{1,64}")
 MAX_TOOL_OUTPUT_CHARS = 2_000_000
 
 
 class GroundingError(ValueError):
     """A safe diagnostic that contains no user query or retrieved content."""
+
+    @property
+    def code(self) -> str:
+        """Fixed reason code for telemetry; anything else is never emitted."""
+        reason = str(self)
+        return reason if REASON_CODE.fullmatch(reason) else "unspecified"
+
+
+def is_unknown_answer(text: str) -> bool:
+    """The fixed refusal, tolerating only a single final period added by the model."""
+    return text.strip() in {UNKNOWN_ANSWER, UNKNOWN_ANSWER + "."}
 
 
 @dataclass(frozen=True)
@@ -144,7 +156,7 @@ def validate_response(response) -> Answer:
     text = "\n".join(texts).strip()
     if not text:
         raise GroundingError("empty_answer")
-    if text == UNKNOWN_ANSWER:
+    if is_unknown_answer(text):
         return Answer(text, (), str(data.get("id", "")), True)
     cited = list(dict.fromkeys(CITATION.findall(text)))
     if "[ref_id:" in CITATION.sub("", text):

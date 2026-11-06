@@ -10,7 +10,7 @@ From this repository's root, after its setup and dependency installation:
 python scripts/validate_lab.py smoke
 ```
 
-Smoke checks: Known answer (30 days) with validated citations, and abstention for an unknown question against the synthetic dedicated-lab documents.
+Smoke checks: Known answer (30 days) with validated citations that include the return-policy document, and abstention for an unknown question against the synthetic dedicated-lab documents.
 
 The existing lab remains provisioned after smoke, including after failure.
 A readiness failure prevents model requests. Run `python scripts/lab.py delete`

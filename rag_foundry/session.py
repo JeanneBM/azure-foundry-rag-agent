@@ -1,7 +1,7 @@
 """Bounded local history containing only accepted answers."""
 
 from rag_foundry.config import ConfigError, Settings
-from rag_foundry.grounding import validate_response
+from rag_foundry.grounding import GroundingError, validate_response
 from rag_foundry.observation import observe_response
 from rag_foundry.telemetry import Trace
 
@@ -39,7 +39,13 @@ class RagSession:
             },
         )
         observe_response(response, trace)
-        answer = validate_response(response)
+        try:
+            answer = validate_response(response)
+        except GroundingError as exc:
+            # Only the fixed reason code is recorded, never the response or evidence.
+            trace.event("validation", status="rejected", reason=exc.code)
+            raise
+        trace.event("validation", status="accepted", attrs={"unknown": answer.unknown})
         self.history.extend([user, {"role": "assistant", "content": answer.text}])
         limit = self.settings.history_turns * 2
         self.history = self.history[-limit:] if limit else []

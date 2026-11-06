@@ -12,7 +12,7 @@ Answers are configured to be in English, cite retrieved sources and refuse quest
 outside the connected documents. This is a document Q&A demo, not a general assistant.
 
 [Use your own knowledge base](docs/quickstart.md) · [Lab reports](docs/lab-validation.md)
-· [Troubleshooting](docs/troubleshooting.md) · [GitHub Actions](GITHUB_ACTIONS.md)
+· [Troubleshooting](docs/troubleshooting.md) · [GitHub Actions](docs/github-actions.md)
 
 ## Demo knowledge base
 
@@ -25,7 +25,8 @@ The lab indexes two synthetic documents from [examples/lab-documents.json](examp
 
 Try `What is the product return period?`, `What are the support hours?` and
 `What is Kubernetes?`. The last question is outside the demo corpus and should
-produce exactly `I don't know`. A validation error is a failed request, not a refusal.
+produce exactly `I don't know` (a single final period is tolerated). A validation
+error is a failed request, not a refusal.
 The interactive terminal displays an introduction with the demo's scope.
 
 ## How it works
@@ -47,7 +48,8 @@ envelope, including JSON-encoded MCP text wrappers.
 Citations can use `[ref_id:X]` with an actual returned ID or native `url_citation`
 annotations. A native URL must match exactly one document from the same retrieval,
 with valid text offsets. Unknown IDs, invented URLs, ambiguous matches, malformed
-results and uncited factual answers are rejected. Citation URLs are never fetched
+results and factual answers without any citation are rejected. The validator does
+not require a separate citation for every sentence. Citation URLs are never fetched
 by the validator.
 
 **These checks establish provenance, not whether every claim follows from its source.**
@@ -162,7 +164,7 @@ python -m pytest -q
 
 Tests cover SDK serialization, version reuse, both MCP envelopes, citation rejection,
 subscription isolation, telemetry and lab lifecycle/reporting. CI makes no live Azure
-calls; [GitHub Actions](GITHUB_ACTIONS.md) documents its scope.
+calls; [GitHub Actions](docs/github-actions.md) documents its scope.
 A separate CodeQL workflow scans Python on pushes, pull requests and weekly.
 The badges above show workflow results on `main`; they do not certify the absence of vulnerabilities.
 
@@ -183,7 +185,8 @@ Use only a KB intended for all authorized users of this client. Requests use
 
 Telemetry is opt-in via `AGENT_TELEMETRY_FILE` (JSONL) or `AGENT_TELEMETRY_STDOUT=1`.
 It records timing, tool names, reference IDs, native citation counts, available token
-usage and outcomes. It excludes questions, answers, retrieved text, tool arguments
+usage, outcomes and the validation result with its fixed reason code (for example
+`missing_citations`). It excludes questions, answers, retrieved text, tool arguments
 and argument hashes. Metadata is operational data, not anonymous data. No external
 monitoring platform is required.
 
