@@ -1,7 +1,7 @@
 -c requirements.txt
 -r requirements.in
 pytest==9.1.1
-ruff==0.16.10
+ruff==0.17.3
 
 # Pin Windows-only pytest/tqdm dependency so hashed installs work on Windows.
 colorama==0.4.6
