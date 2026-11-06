@@ -14,6 +14,7 @@ def observe_response(response, trace):
     )
     retrieved = set()
     texts = []
+    native_citation_count = 0
     for item in data.get("output", []):
         if item.get("type") == "mcp_call":
             # Tool names are observed, never replaced with the expected allowlisted name.
@@ -24,6 +25,11 @@ def observe_response(response, trace):
                 except GroundingError:
                     trace.event("escalation", status="invalid_retrieval_metadata")
         if item.get("type") == "message" and item.get("role") == "assistant":
+            native_citation_count += sum(
+                len(part.get("annotations", []))
+                for part in item.get("content", [])
+                if part.get("type") == "output_text"
+            )
             texts.extend(
                 part.get("text", "")
                 for part in item.get("content", [])
@@ -35,4 +41,5 @@ def observe_response(response, trace):
         citations=list(dict.fromkeys(CITATION.findall(text))),
         retrieved=sorted(retrieved),
         status="abstained" if text == UNKNOWN_ANSWER else "answered",
+        attrs={"native_citation_count": native_citation_count},
     )

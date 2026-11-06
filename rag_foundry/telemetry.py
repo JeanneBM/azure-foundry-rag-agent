@@ -2,21 +2,12 @@
 
 from __future__ import annotations
 
-import contextvars
 import json
 import logging
 import os
 import time
 import uuid
 from pathlib import Path
-
-_active = contextvars.ContextVar("agent_trace", default=None)
-
-
-def emit(kind, **values):
-    trace = _active.get()
-    if trace is not None:
-        trace.event(kind, **values)
 
 
 class Trace:
@@ -60,7 +51,6 @@ class Trace:
         self.event("tool_call", tool=name)
 
     def __enter__(self):
-        self.token = _active.set(self)
         self.event("run_started")
         return self
 
@@ -69,10 +59,3 @@ class Trace:
             self.status = "error"
             self.event("escalation", status="error", attrs={"error_type": kind.__name__})
         self.event("run_finished", status=self.status)
-        _active.reset(self.token)
-
-
-def tool(name, arguments):
-    trace = _active.get()
-    if trace is not None:
-        trace.tool(name, arguments)

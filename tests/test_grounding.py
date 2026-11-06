@@ -90,9 +90,15 @@ def test_requires_new_retrieval_even_for_unknown():
 def test_does_not_treat_annotations_as_retrieval_evidence():
     payload = response_payload("Fictional answer")
     payload["output"][1]["content"][0]["annotations"] = [
-        {"type": "url_citation", "url": "https://example.com", "title": "Made up"}
+        {
+            "type": "url_citation",
+            "url": "https://example.com",
+            "title": "Made up",
+            "start_index": 0,
+            "end_index": len("Fictional answer"),
+        }
     ]
-    with pytest.raises(GroundingError, match="missing_citations"):
+    with pytest.raises(GroundingError, match="unknown_citation"):
         validate_response(payload)
 
 
@@ -142,4 +148,28 @@ def test_second_retrieval_is_rejected_even_without_reference_collision(records):
     second = {**payload["output"][0], "id": "mcp_second", "output": json.dumps(records)}
     payload["output"].insert(1, second)
     with pytest.raises(GroundingError, match="multiple_retrieval_calls"):
+        validate_response(payload)
+
+
+@pytest.mark.parametrize("output", ["", "\n", " \r\n\t", json.dumps("\n")])
+def test_blank_mcp_output_allows_only_exact_abstention(output):
+    payload = response_payload("I don't know")
+    payload["output"][0]["output"] = output
+    answer = validate_response(Response.model_validate(payload))
+    assert answer.unknown
+    assert answer.sources == ()
+    for text, reason in [
+        ("The return period is 30 days.", "missing_citations"),
+        ("30 days [ref_id:0]", "unknown_citation"),
+        ("I don't know, but probably 30 days.", "missing_citations"),
+    ]:
+        payload["output"][1]["content"][0]["text"] = text
+        with pytest.raises(GroundingError, match=reason):
+            validate_response(payload)
+
+
+def test_blank_mcp_output_with_tool_error_still_fails():
+    payload = response_payload("I don't know")
+    payload["output"][0].update(output="\n", error={"message": "failed"})
+    with pytest.raises(GroundingError, match="retrieval_failed"):
         validate_response(payload)

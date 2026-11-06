@@ -36,6 +36,10 @@ def _decode(payload: Any, depth: int = 0) -> list[dict[str, Any]]:
     if isinstance(payload, str):
         if len(payload) > MAX_TOOL_OUTPUT_CHARS:
             raise GroundingError("retrieval_output_too_large")
+        # Observed Foundry MCP no-evidence output can be whitespace only.
+        # This supplies no records; only the exact refusal can pass validation.
+        if not payload.strip():
+            return []
         try:
             decoded = json.loads(payload)
         except (ValueError, RecursionError) as exc:
@@ -101,6 +105,7 @@ def validate_response(response) -> Answer:
     records: dict[str, dict[str, Any]] = {}
     retrieved = False
     texts = []
+    annotated_parts = []
     for item in data.get("output", []):
         kind = item.get("type")
         if kind == "mcp_approval_request":
@@ -130,6 +135,7 @@ def validate_response(response) -> Answer:
                     raise GroundingError("model_refusal")
                 if content.get("type") == "output_text":
                     texts.append(content.get("text", ""))
+                    annotated_parts.append(content)
         elif kind not in {"reasoning", "mcp_list_tools"}:
             raise GroundingError("unexpected_output_item")
 
@@ -141,12 +147,35 @@ def validate_response(response) -> Answer:
     if text == UNKNOWN_ANSWER:
         return Answer(text, (), str(data.get("id", "")), True)
     cited = list(dict.fromkeys(CITATION.findall(text)))
-    if not cited:
-        raise GroundingError("missing_citations")
     if "[ref_id:" in CITATION.sub("", text):
         raise GroundingError("malformed_citation")
     if any(key not in records for key in cited):
         raise GroundingError("unknown_citation")
+    for part in annotated_parts:
+        for annotation in part.get("annotations", []):
+            if annotation.get("type") != "url_citation":
+                raise GroundingError("unsupported_citation_format")
+            start, end = annotation.get("start_index"), annotation.get("end_index")
+            if (
+                type(start) is not int
+                or type(end) is not int
+                or not 0 <= start < end <= len(part.get("text", ""))
+            ):
+                raise GroundingError("malformed_citation")
+            url = annotation.get("url")
+            if not isinstance(url, str) or not url:
+                raise GroundingError("malformed_citation")
+            # Native citations are accepted only against a unique, exact URL
+            # returned by this retrieval. No URL rewriting or network lookup.
+            matches = [key for key, record in records.items() if record.get("url") == url]
+            if not matches:
+                raise GroundingError("unknown_citation")
+            if len(matches) != 1:
+                raise GroundingError("ambiguous_citation_url")
+            if matches[0] not in cited:
+                cited.append(matches[0])
+    if not cited:
+        raise GroundingError("missing_citations")
     # Metadata only: don't repeat full retrieved chunks in the UI or logs.
     sources = tuple(
         {key: value for key, value in records[ref].items() if key != "content"} for ref in cited
