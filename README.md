@@ -184,7 +184,8 @@ Use only a KB intended for all authorized users of this client. Requests use
 
 Telemetry is opt-in via `AGENT_TELEMETRY_FILE` (JSONL) or `AGENT_TELEMETRY_STDOUT=1`.
 It records timing, tool names, reference IDs, native citation counts, available token
-usage and outcomes. It excludes questions, answers, retrieved text, tool arguments
+usage, outcomes and the validation result with its fixed reason code (for example
+`missing_citations`). It excludes questions, answers, retrieved text, tool arguments
 and argument hashes. Metadata is operational data, not anonymous data. No external
 monitoring platform is required.
 
