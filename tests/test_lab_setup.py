@@ -126,7 +126,14 @@ def test_repair_mcp_updates_only_connection_and_agent(tmp_path, monkeypatch, chi
 
     monkeypatch.setattr(module, "az", az)
     monkeypatch.setattr(module, "request", lambda *args, **kwargs: requests.append(args))
-    monkeypatch.setattr(module, "child", lambda *args: child_result)
+
+    def deploy_child(root, child_state, args):
+        assert child_state["ready"] is True
+        assert json.loads(path.read_text())["ready"] is False
+        assert args == ["create_rag_agent.py"]
+        return child_result
+
+    monkeypatch.setattr(module, "child", deploy_child)
     if child_result:
         with pytest.raises(module.LabError, match="Agent update failed"):
             module.repair_mcp()
