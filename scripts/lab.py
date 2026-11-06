@@ -22,6 +22,7 @@ from lab_support import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SEARCH_API = "2026-04-01"
+MCP_API = "2026-08-01-preview"
 CONNECTION_API = "2025-10-01-preview"
 
 
@@ -221,7 +222,7 @@ def setup(args):
         "PUT",
         {"name": "demo-kb", "knowledgeSources": [{"name": "demo-source"}]},
     )
-    mcp = f"{endpoint}/knowledgebases/demo-kb/mcp?api-version={SEARCH_API}"
+    mcp = f"{endpoint}/knowledgebases/demo-kb/mcp?api-version={MCP_API}"
     request(
         state,
         f"https://management.azure.com{project['id']}/connections/demo-kb-mcp?api-version={CONNECTION_API}",
@@ -261,6 +262,56 @@ def setup(args):
     print("Basic Search remains billable until python scripts/lab.py delete completes.")
 
 
+def repair_mcp():
+    """Update the existing connection and agent without provisioning infrastructure."""
+    path, state = load(ROOT)
+    owned_group(state)
+    if not state.get("environment"):
+        raise LabError("No configured lab environment. Complete setup first.")
+    project = az(
+        "cognitiveservices",
+        "account",
+        "project",
+        "show",
+        "-n",
+        state["accountName"],
+        "-g",
+        state["resourceGroup"],
+        "--project-name",
+        "rag-demo",
+        subscription=state["subscriptionId"],
+    )
+    endpoint = f"https://rag-search-{state['generation'][:10]}.search.windows.net"
+    mcp = f"{endpoint}/knowledgebases/demo-kb/mcp?api-version={MCP_API}"
+    state["ready"] = False
+    save(path, state)
+    request(
+        state,
+        f"https://management.azure.com{project['id']}/connections/demo-kb-mcp?api-version={CONNECTION_API}",
+        "PUT",
+        {
+            "name": "demo-kb-mcp",
+            "properties": {
+                "authType": "ProjectManagedIdentity",
+                "category": "RemoteTool",
+                "target": mcp,
+                "isSharedToAll": True,
+                "audience": "https://search.azure.com/",
+                "metadata": {"ApiType": "Azure"},
+            },
+        },
+        audience="https://management.azure.com/",
+    )
+    state["environment"]["RAG_MCP_ENDPOINT"] = mcp
+    state["environment"]["AGENT_VERSION"] = ""
+    save(path, state)
+    if child(ROOT, state, ["create_rag_agent.py"]):
+        raise LabError("Agent update failed. Retain state and rerun repair-mcp.")
+    state["ready"] = True
+    save(path, state)
+    print("MCP connection and agent updated. Run python scripts/lab.py smoke.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="action", required=True)
@@ -272,6 +323,7 @@ def main():
     provision.add_argument("--model-version", default="2025-04-14")
     provision.add_argument("--capacity", type=int, choices=range(1, 101), default=10)
     commands.add_parser("smoke", help="Run known/unknown questions against synthetic documents")
+    commands.add_parser("repair-mcp", help="Update existing MCP connection and agent only")
     run = commands.add_parser("run", help="Start the interactive CLI; exit stops the local client")
     run.add_argument("--question")
     commands.add_parser(
@@ -280,6 +332,9 @@ def main():
     cleanup = commands.add_parser("delete", help="Delete and verify the dedicated resource group")
     cleanup.add_argument("--confirm", help="Exact recorded resource-group name (noninteractive)")
     args = parser.parse_args()
+    if args.action == "repair-mcp":
+        repair_mcp()
+        return 0
     if args.action == "setup":
         setup(args)
         return 0
