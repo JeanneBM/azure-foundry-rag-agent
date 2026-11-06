@@ -1,6 +1,5 @@
 """Bounded local history containing only accepted answers."""
 
-from rag_foundry.agent import RETRIEVE_TOOL, SERVER_LABEL
 from rag_foundry.config import ConfigError, Settings
 from rag_foundry.grounding import validate_response
 from rag_foundry.observation import observe_response
@@ -29,7 +28,8 @@ class RagSession:
             input=[*self.history, user],
             store=False,
             max_output_tokens=self.settings.max_output_tokens,
-            tool_choice={"type": "mcp", "server_label": SERVER_LABEL, "name": RETRIEVE_TOOL},
+            # Inherit forced retrieval from the pinned agent definition.
+            # Foundry rejects conflicting per-response tool_choice overrides.
             extra_body={
                 "agent_reference": {
                     "name": self.settings.agent_name,
