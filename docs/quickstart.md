@@ -1,8 +1,8 @@
 # Azure Foundry RAG Agent
 
-A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. The application deploys the **agent definition**. An optional [dedicated demo lab](README.md#dedicated-demo-lab-setup--smoke--run--delete) provisions isolated Azure resources and synthetic documents; no HTTP API is served.
+A versioned Microsoft Foundry prompt agent connected to an existing Azure AI Search Knowledge Base through MCP, with a guarded terminal client. The application deploys the **agent definition**. An optional [dedicated demo lab](../README.md#dedicated-demo-lab-setup--smoke--run--delete) provisions isolated Azure resources and synthetic documents; no HTTP API is served.
 
-[Complete documentation](README.md) · [Offline CI setup](GITHUB_ACTIONS.md)
+[Complete documentation](../README.md) · [Offline CI setup](../GITHUB_ACTIONS.md)
 
 ## Prerequisites
 
@@ -26,9 +26,9 @@ az login
 
 Fill in the project endpoint, KB MCP endpoint and RemoteTool connection name. Model deployment and agent name default to `gpt-4.1-mini` and `RagAgent`. Process environment variables override the local `.env`.
 
-Set `AZURE_CREDENTIAL_MODE=cli` for explicit Azure CLI authentication, `managed_identity` for an Azure runtime, or `default` for the noninteractive Entra credential chain. For a user-assigned runtime identity, set `MANAGED_IDENTITY_CLIENT_ID`.
+Set `AZURE_CREDENTIAL_MODE=cli` for explicit Azure CLI authentication, `managed_identity` for an Azure runtime, or `default` for the noninteractive Entra credential chain. For a user-assigned runtime identity, set `MANAGED_IDENTITY_CLIENT_ID`. In CLI mode, optionally set `AZURE_CLI_SUBSCRIPTION` to scope token requests without changing the global `az` default.
 
-The example Search endpoint uses GA API `2026-04-01` for extractive retrieval. Use your actual Azure-provided endpoint if it requires another version. Assess preview features separately before production use. The grounding parser accepts nonempty `content` records with `ref_id`, directly or wrapped in MCP `content[].text` or `result.content[].text`. Unknown schemas are rejected.
+The example MCP endpoint uses preview API `2026-08-01-preview`. The lab uses GA `2026-04-01` separately for index and knowledge-base provisioning. Use your actual Azure-provided endpoint if it requires another version. Assess preview features separately before production use. The grounding parser accepts nonempty `content` records with `ref_id`, directly or wrapped in MCP `content[].text` or `result.content[].text`. Unknown schemas are rejected.
 
 | Setting | Default / purpose |
 |---|---|
@@ -49,9 +49,9 @@ python smoke_test.py \
   --unknown-question "What is a private phone number absent from the documents?"
 ```
 
-Replace these sample questions and expected substring with tests for your KB. The known-answer check requires actual retrieval, valid citations and the expected substring. The unknown-answer check requires exact `I don't know`. Retrieval or validation failures exit with code 1.
+Replace these sample questions and expected substring with tests for your KB. The known-answer check requires actual retrieval, valid citations and the expected substring. The unknown-answer check requires exact English `I don't know`, even for Polish questions; the agent instructions explicitly make this an exception to the user-language rule. Retrieval or validation failures exit with code 1.
 
-Deployment reuses the latest version when its complete definition matches. A changed definition, or `--force`, creates a new immutable version. An atomic manifest records the candidate version. Treat it as a verified release only after live checks pass.
+Deployment reuses the latest version when its stored `config_sha256` and `managed_by` metadata match the requested definition’s fingerprint. Server-added defaults do not affect reuse; versions without matching metadata create a new candidate. A changed definition, or `--force`, creates a new immutable version. An atomic manifest records the candidate version. Treat it as a verified release only after live checks pass.
 
 Pin the tested `AGENT_VERSION` in the client environment:
 
@@ -64,11 +64,11 @@ Version precedence is `--version`, then `AGENT_VERSION`, then a manifest matchin
 
 ## Grounding and errors
 
-Both the agent definition and each request force the KB retrieval tool. Before displaying a factual answer, the client checks response completion, successful MCP retrieval, nonempty evidence and citation IDs matching the current retrieval results. It displays `[ref_id:X]` citations and source metadata; it does not invent source URLs.
+The pinned agent definition forces the KB retrieval tool. Requests inherit that setting and deliberately omit `tool_choice` to avoid conflicting overrides. Exactly one retrieval call per response is accepted; a second call fails with `multiple_retrieval_calls`. Before displaying a factual answer, the client checks response completion, successful MCP retrieval, nonempty evidence and citation IDs matching the current retrieval results. It displays `[ref_id:X]` citations and source metadata; it does not invent source URLs.
 
 These are provenance checks, **not proof that every claim follows from the cited evidence**. Evaluate answer accuracy and retrieval quality using representative data. Other clients calling the Foundry agent directly bypass this repository's response checks.
 
-Interactive validation failures display `I don't know` and a separate safe diagnostic on stderr. One-shot requests fail with code 1 and never emit rejected answers. Network and permission failures are distinguished from legitimate unknown answers. Remote error bodies and document chunks are not printed in diagnostics.
+Interactive validation failures display an unavailable-answer message and a safe diagnostic on stderr, distinct from a valid refusal. One-shot requests fail with code 1 and never emit rejected answers. Network and permission failures are distinguished from legitimate unknown answers. Remote error bodies and document chunks are not printed in diagnostics.
 
 Only accepted answers enter bounded local history. Each turn performs fresh retrieval. Requests use `store=False` without persistent Conversations; configure Azure service retention separately. Responses SDK retries are capped at two. Agent management has no automatic retries to avoid duplicate versions after a lost create response; inspect Azure state before retrying a timed-out deployment.
 
@@ -85,7 +85,7 @@ There is no implicit deletion target. Move clients away from a version before de
 
 ## Offline CI and local deployment
 
-Pushes and PRs to `main` run only lint, formatting, offline tests and dependency checks. GitHub Actions does not authenticate to Azure or deploy agents, including on manual workflow dispatch. It has no OIDC permission, Azure secrets or deployment job. See [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md).
+Pushes and PRs to `main` run only lint, formatting, offline tests and dependency checks. GitHub Actions does not authenticate to Azure or deploy agents, including on manual workflow dispatch. It has no OIDC permission, Azure secrets or deployment job. See [GITHUB_ACTIONS.md](../GITHUB_ACTIONS.md).
 
 Deploy and run live smoke checks on your own machine using the commands above after `az login`. Retain the verified local manifest and pin its agent version in client environments.
 

@@ -93,3 +93,20 @@ def test_live_smoke_command_contract(settings, monkeypatch, known, unknown, exit
         ],
     )
     assert run(smoke_test.main) == exit_code
+
+
+def test_interactive_rejection_is_not_presented_as_unknown(settings, monkeypatch, capsys):
+    project, client = Mock(), Mock()
+    payload = response_payload()
+    payload["output"].insert(1, {**payload["output"][0], "id": "second"})
+    client.responses.create.return_value = payload
+    monkeypatch.setattr(chat, "project_client", lambda cfg: nullcontext(project))
+    monkeypatch.setattr(chat, "responses_client", lambda *args: nullcontext(client))
+    monkeypatch.setattr(sys, "argv", ["chat.py", "--version", "2"])
+    inputs = iter(["Złożone pytanie po polsku", "exit"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    assert chat.main() == 0
+    captured = capsys.readouterr()
+    assert "Answer unavailable" in captured.out
+    assert "I don't know" not in captured.out
+    assert "multiple_retrieval_calls" in captured.err

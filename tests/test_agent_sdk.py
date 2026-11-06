@@ -8,7 +8,7 @@ from azure.core.credentials import AccessToken
 from azure.core.exceptions import ServiceRequestError
 from azure.core.pipeline.transport import HttpResponse, HttpTransport
 
-from rag_foundry.agent import definition, deploy
+from rag_foundry.agent import definition, deploy, fingerprint
 
 
 class TestCredential:
@@ -38,10 +38,11 @@ class JsonResponse(HttpResponse):
 
 
 class AgentTransport(HttpTransport):
-    def __init__(self, settings, *, fail_create=False, existing=False):
+    def __init__(self, settings, *, fail_create=False, existing=False, metadata=None):
         self.settings = settings
         self.fail_create = fail_create
         self.existing = existing
+        self.metadata = metadata
         self.requests = []
 
     def open(self):
@@ -74,8 +75,16 @@ class AgentTransport(HttpTransport):
                                 "name": self.settings.agent_name,
                                 "version": "2",
                                 "created_at": 1,
-                                "metadata": {},
-                                "definition": definition(self.settings).as_dict(),
+                                "metadata": self.metadata
+                                if self.metadata is not None
+                                else {
+                                    "managed_by": "azure-foundry-rag-agent",
+                                    "config_sha256": fingerprint(definition(self.settings)),
+                                },
+                                "definition": {
+                                    **definition(self.settings).as_dict(),
+                                    "temperature": 1.0,
+                                },
                             }
                         },
                     },
@@ -141,3 +150,21 @@ def test_azure_sdk_reuses_deserialized_latest_version(settings):
         agent, created, _ = deploy(project, settings)
     assert agent.version == "2" and not created
     assert len(transport.requests) == 1
+
+
+@pytest.mark.parametrize(
+    "metadata,force",
+    [
+        ({}, False),
+        ({"managed_by": "azure-foundry-rag-agent", "config_sha256": "old"}, False),
+        (None, True),
+    ],
+)
+def test_missing_changed_metadata_or_force_creates_new_version(settings, metadata, force):
+    transport = AgentTransport(settings, existing=True, metadata=metadata)
+    with AIProjectClient(
+        settings.project_endpoint, TestCredential(), transport=transport, retry_total=0
+    ) as project:
+        _, created, _ = deploy(project, settings, force=force)
+    assert created
+    assert sum(request.method == "POST" for request in transport.requests) == 1

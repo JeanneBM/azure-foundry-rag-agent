@@ -15,7 +15,9 @@ def make_credential(settings: Settings):
             kwargs["client_id"] = settings.managed_identity_client_id
         return ManagedIdentityCredential(**kwargs)
     if settings.credential_mode == "cli":
-        return AzureCliCredential(process_timeout=30)
+        return AzureCliCredential(
+            process_timeout=30, subscription=settings.cli_subscription or None
+        )
     return DefaultAzureCredential(exclude_interactive_browser_credential=True)
 
 

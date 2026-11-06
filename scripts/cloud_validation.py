@@ -1,4 +1,4 @@
-"""Repository-local adapters for Foundry RAG and LangGraph demo labs."""
+"""Validation adapter for this repository's dedicated Foundry RAG lab."""
 
 from __future__ import annotations
 
@@ -6,14 +6,13 @@ import json
 import os
 import sys
 from pathlib import Path
-from uuid import uuid4
 
 from lab_validation import Outcome, Unavailable, azure, execute, selected_environment
 
 
 class CloudLab:
-    def __init__(self, root, repository, group, kind):
-        self.root, self.repository, self.group, self.kind = root, repository, group, kind
+    def __init__(self, root, repository, group):
+        self.root, self.repository, self.group = root, repository, group
         self.subscription = None
 
     def state(self):
@@ -59,7 +58,7 @@ class CloudLab:
         owned_group(state)
         if not state.get("ready"):
             return Outcome("INCONCLUSIVE", "setup_incomplete")
-        name = "rag-model" if self.kind == "rag" else "ci-repair-model"
+        name = "rag-model"
         model = azure(
             "cognitiveservices",
             "account",
@@ -80,8 +79,7 @@ class CloudLab:
             "modelVersionMatches": model["properties"]["model"]["version"]
             == state["config"]["version"],
         }
-        if self.kind == "rag":
-            checks["manifestPresent"] = Path(state["environment"]["DEPLOYMENT_FILE"]).is_file()
+        checks["manifestPresent"] = Path(state["environment"]["DEPLOYMENT_FILE"]).is_file()
         (directory / "checks.json").write_text(json.dumps(checks, indent=2), encoding="utf-8")
         return Outcome(
             "PASS" if all(checks.values()) else "INCONCLUSIVE", "readiness_checked", checks
@@ -108,9 +106,7 @@ class CloudLab:
     def smoke(self, directory):
         state = self.state()
         env = selected_environment(state)
-        if self.kind == "rag":
-            return self.rag_smoke(directory, env)
-        return self.graph_smoke(directory, env)
+        return self.rag_smoke(directory, env)
 
     def rag_smoke(self, directory, env):
         # The guarded client is tested directly; raw answer/document bodies stay out of reports.
@@ -155,74 +151,7 @@ class CloudLab:
                 "unsupported_retrieval_format",
                 "missing_retrieval_output",
             }
-            return Outcome(
-                "INCONCLUSIVE" if str(exc) in environmental else "FAIL", "grounding_check_rejected"
-            )
+            return Outcome("INCONCLUSIVE" if str(exc) in environmental else "FAIL", str(exc))
         finally:
             os.environ.clear()
             os.environ.update(previous)
-
-    def graph_smoke(self, directory, env):
-        output = directory / "artifacts"
-        checks = {}
-        for scenario, action in (("S01", "approve"), ("S03", "reject")):
-            thread = "smoke-" + uuid4().hex
-            cli = [sys.executable, "-m", "ci_repair.cli"]
-            execute(
-                [
-                    *cli,
-                    "run",
-                    "--mode",
-                    "azure",
-                    "--scenario",
-                    scenario,
-                    "--thread",
-                    thread,
-                    "--output",
-                    str(output),
-                ],
-                self.root,
-                directory,
-                env=env,
-                timeout=240,
-            )
-            folder = output / thread
-            evidence = folder / "evidence.json"
-            state = json.loads(evidence.read_text(encoding="utf-8"))
-            if state["status"] != "awaiting_approval":
-                transport = (
-                    state.get("feedback") == "Model response failed or did not match the schema."
-                )
-                return Outcome(
-                    "INCONCLUSIVE" if transport else "FAIL", "approval_gate_not_reached", checks
-                )
-            (folder / "approval-gate.json").write_text(
-                evidence.read_text(encoding="utf-8"), encoding="utf-8"
-            )
-            checks[scenario + "ApprovalGate"] = not (folder / "repair.patch").exists()
-            execute(
-                [*cli, action, "--thread", thread, "--output", str(output)],
-                self.root,
-                directory,
-                env=env,
-                timeout=60,
-            )
-            resumed = json.loads(evidence.read_text(encoding="utf-8"))
-            if action == "approve":
-                checks[scenario + "ApprovedExport"] = (
-                    resumed["status"] == "draft_prepared"
-                    and (folder / "repair.patch").is_file()
-                    and (folder / "draft-pr.md").is_file()
-                    and bool(resumed.get("diff"))
-                    and (folder / "repair.patch").read_text(encoding="utf-8") == resumed["diff"]
-                    and (folder / "draft-pr.md").read_text(encoding="utf-8") == resumed["draft"]
-                )
-            else:
-                checks[scenario + "RejectedWithoutExport"] = (
-                    resumed["status"] == "rejected" and not (folder / "repair.patch").exists()
-                )
-        return Outcome(
-            "PASS" if all(checks.values()) else "FAIL",
-            "live_graph_and_restart_approval_checked",
-            checks,
-        )

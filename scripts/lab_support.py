@@ -197,5 +197,6 @@ def child(root: Path, state: dict, args: list[str]):
     env.update(state["environment"])
     # Dedicated labs use Entra auth; never accidentally select an inherited API key/version.
     env["AZURE_OPENAI_API_KEY"] = ""
-    az("account", "set", "--subscription", state["subscriptionId"])
+    env["AZURE_CREDENTIAL_MODE"] = "cli"
+    env["AZURE_CLI_SUBSCRIPTION"] = state["subscriptionId"]
     return subprocess.call([sys.executable, *args], cwd=root, env=env)

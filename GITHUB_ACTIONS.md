@@ -29,8 +29,10 @@ Configure your local `.env`, log in with `az login` and run `python create_rag_a
 
 The script writes the candidate version to local `deployment.json`. After verification, retain the manifest and set `AGENT_VERSION` in client environments. Rollback selects a previous verified version. Full instructions are in [README.md](README.md).
 
-## Remove previous GitHub-to-Azure access
+## Supply-chain controls
 
-If you previously configured GitHub OIDC for this repository, remove its federated credential from the corresponding Entra App Registration or Managed Identity. Do not remove credentials used by other applications.
-
-Remove repository/environment secrets and variables created solely for the former Azure deployment workflow. Existing credentials are not deleted by changing this workflow; their removal must be performed in GitHub and Azure settings. This change does not modify Azure configuration.
+Actions are pinned to full commit SHAs, with their major versions in comments.
+Dependabot checks GitHub Actions and pip inputs weekly. Dependency updates still
+require review of both hashed lock files; a green dependency PR is not a live Azure test.
+Windows CI verifies hashed dependency installation and starts the test runner;
+Linux CI runs the complete offline suite, lint and formatting checks.

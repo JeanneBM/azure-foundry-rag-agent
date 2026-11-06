@@ -4,7 +4,7 @@ A RAG agent on Microsoft Foundry Agent Service that uses an Azure AI Search Know
 
 The client forces a `knowledge_base_retrieve` call and validates the result before displaying the answer. Factual answers must cite identifiers actually returned by the current retrieval. These checks establish source provenance, but do not prove that every sentence follows from the documents. Retrieval quality and answer faithfulness require evaluation on your target data.
 
-[Quick-start guide](README_EN.md) · [Offline GitHub Actions](GITHUB_ACTIONS.md)
+[Quick-start guide](docs/quickstart.md) · [Offline GitHub Actions](GITHUB_ACTIONS.md)
 
 ## Individual lab reports
 
@@ -105,6 +105,7 @@ Fill in `.env` with your actual values. Do not include tokens or keys in endpoin
 | `AGENT_VERSION` | Explicit tested version for the client; reads the manifest when unset |
 | `DEPLOYMENT_FILE` | Release manifest; defaults to `deployment.json` |
 | `AZURE_CREDENTIAL_MODE` | `default`, `cli` or `managed_identity` |
+| `AZURE_CLI_SUBSCRIPTION` | Optional subscription for CLI token requests; does not change the global Azure CLI default |
 | `MANAGED_IDENTITY_CLIENT_ID` | Optional client ID of a user-assigned identity |
 | `REQUEST_TIMEOUT_SECONDS` | Timeout for a single request attempt; defaults to 120 seconds |
 | `MAX_OUTPUT_TOKENS` | Generated response limit; defaults to 2048 |
@@ -120,7 +121,7 @@ and preview API `2026-08-01-preview` for the MCP endpoint. If your KB configurat
 python create_rag_agent.py
 ```
 
-The script compares the complete definition with the latest version. If they match, it reuses the existing version. A changed definition creates a new immutable version. `--force` creates a new version even without changes. The result is written atomically to `deployment.json`.
+The script fingerprints the requested definition and compares it with the latest version’s stored `config_sha256` and `managed_by` metadata. A match reuses the version, even if Foundry adds default fields to the returned definition. Versions without matching metadata are not reused. A changed definition creates a new immutable version. `--force` creates a new version even without changes. The result is written atomically to `deployment.json`.
 
 **The newly created manifest describes a candidate** until it passes checks on Azure. Use two questions tailored to your knowledge base: one with a known answer and one the KB cannot answer.
 
@@ -145,9 +146,9 @@ The client displays `[ref_id:X]` citations and metadata for the cited sources. I
 ## Error handling
 
 - Missing retrieval, MCP errors, incomplete responses or citations outside the current results cause the model's answer to be rejected.
-- Interactive mode displays `I don't know` and a separate diagnostic on stderr. `--question` mode exits with code 1 without emitting an unverified answer.
+- Interactive mode displays a validation-failure message and a separate diagnostic on stderr; this is distinct from a valid unknown answer. `--question` mode exits with code 1 without emitting an unverified answer.
 - Network and RBAC errors are distinguished from a lack of knowledge. Remote error bodies, tokens and document chunks are not printed in diagnostics.
-- Only accepted answers enter local history. Every new question requires fresh retrieval.
+- Only accepted answers enter local history. Every new question requires exactly one retrieval call. A second call is rejected as `multiple_retrieval_calls` because reference IDs are scoped to one call. The knowledge base can decompose the complete question internally.
 - The Responses API is called with `store=False`; the client does not create persistent Conversations. Configure Azure service retention and monitoring policies separately.
 - Responses calls have at most two SDK retries. The timeout applies to each attempt. Agent management has no automatic retries to avoid duplicate versions after a lost response. After a timeout during creation, inspect the agent's state in Azure first.
 
@@ -195,18 +196,15 @@ pip-compile --generate-hashes --no-emit-index-url --no-emit-trusted-host -o requ
 - [AgentReference and the Responses API](https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/aiproject)
 - [Runtime and response storage](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/runtime-components)
 
-## License
-
-MIT
-
 ## Runtime observability
 
-Set `AGENT_TELEMETRY_FILE` to an absolute JSONL path watched by the platform monitor.
+Telemetry is optional. Set `AGENT_TELEMETRY_FILE` to an absolute JSONL path for a log collector of your choice; no external monitoring platform is required.
 Each client question emits a real-time run, observed MCP tool names, retrieved and
 cited reference IDs, provider token usage when present and its terminal outcome.
 Observation happens before grounding validation, so rejected answers remain visible.
-Raw questions, answers, retrieved chunks and tool arguments are excluded.
-The platform enables this automatically; clients launched elsewhere must opt in.
+Raw questions, answers, retrieved chunks, tool arguments and argument hashes are excluded.
+The file still contains metadata (tool names, reference IDs, timing and token counts).
+Treat it as operational data, not anonymous data. Telemetry is disabled unless explicitly enabled.
 
 ## Repair an existing lab MCP endpoint
 
@@ -217,3 +215,14 @@ manifest. It does not provision infrastructure or change the corpus. A failed up
 leaves `ready=false` and can be retried. Then run `python scripts/lab.py smoke`.
 Existing clients pinned to an older version retain that version; move them only after
 verifying the candidate. MCP is preview even though the provisioning Search API is GA.
+
+## Response language
+
+Supported factual answers follow the user’s language. Insufficient evidence always uses
+the fixed English sentinel `I don't know`, including for Polish questions; the instructions
+explicitly prohibit translating it. A localized refusal is rejected rather than silently
+accepted. Validation and transport failures are errors, not successful refusals.
+
+## License
+
+MIT

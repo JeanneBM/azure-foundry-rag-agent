@@ -83,6 +83,8 @@ def validate_response(response) -> Answer:
         if kind == "mcp_call":
             if item.get("server_label") != SERVER_LABEL or item.get("name") != RETRIEVE_TOOL:
                 raise GroundingError("unexpected_tool_call")
+            if retrieved:
+                raise GroundingError("multiple_retrieval_calls")
             if item.get("error") or item.get("status") not in (None, "completed"):
                 raise GroundingError("retrieval_failed")
             output = item.get("output")

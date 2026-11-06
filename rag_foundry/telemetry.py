@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextvars
-import hashlib
 import json
 import logging
 import os
@@ -57,12 +56,8 @@ class Trace:
             logging.getLogger(__name__).error("agent_telemetry_write_failed")
 
     def tool(self, name, arguments):
-        blob = json.dumps(arguments, sort_keys=True, default=str).encode()
-        self.event(
-            "tool_call",
-            tool=name,
-            args_hash=hashlib.sha256(blob).hexdigest() if arguments is not None else None,
-        )
+        # No argument fingerprint: short questions are vulnerable to dictionary attacks.
+        self.event("tool_call", tool=name)
 
     def __enter__(self):
         self.token = _active.set(self)

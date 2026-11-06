@@ -65,6 +65,7 @@ class Settings:
     max_question_chars: int
     history_turns: int
     deployment_file: Path
+    cli_subscription: str = ""
 
     @classmethod
     def from_env(cls, *, deployment: bool = False) -> Settings:
@@ -119,4 +120,5 @@ class Settings:
             max_question_chars=_integer("MAX_QUESTION_CHARS", 8000, 1, 32000),
             history_turns=_integer("HISTORY_TURNS", 6, 0, 20),
             deployment_file=Path(_value("DEPLOYMENT_FILE", "deployment.json")),
+            cli_subscription=_value("AZURE_CLI_SUBSCRIPTION"),
         )
