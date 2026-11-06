@@ -129,6 +129,8 @@ def setup(args):
         "1",
         "--auth-options",
         "aadOrApiKey",
+        "--aad-auth-failure-mode",
+        "http401WithBearerChallenge",
         "--semantic-search",
         "free",
         "--knowledge-retrieval",
