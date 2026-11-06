@@ -36,6 +36,10 @@ def _decode(payload: Any, depth: int = 0) -> list[dict[str, Any]]:
     if isinstance(payload, str):
         if len(payload) > MAX_TOOL_OUTPUT_CHARS:
             raise GroundingError("retrieval_output_too_large")
+        # Observed Foundry MCP no-evidence output can be whitespace only.
+        # This supplies no records; only the exact refusal can pass validation.
+        if not payload.strip():
+            return []
         try:
             decoded = json.loads(payload)
         except (ValueError, RecursionError) as exc:
