@@ -150,10 +150,9 @@ def setup(args):
         "1",
         "--partition-count",
         "1",
-        "--auth-options",
-        "aadOrApiKey",
-        "--aad-auth-failure-mode",
-        "http401WithBearerChallenge",
+        # Entra ID only: every lab caller uses RBAC tokens, so API keys stay disabled.
+        # disableLocalAuth cannot be combined with --auth-options/--aad-auth-failure-mode.
+        "--disable-local-auth",
         "--semantic-search",
         "free",
         "--knowledge-retrieval",
