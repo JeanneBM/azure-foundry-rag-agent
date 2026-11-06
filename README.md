@@ -47,7 +47,7 @@ until cleanup completes. Existing RAG resources are not adopted or deleted.
 closed. Model inference is metered. Semantic search and knowledge retrieval use
 the free allowance; exhaustion can fail requests. This lab uses public endpoints
 and synthetic data only; it is not a production deployment. Search definitions
-use `2026-04-01`; the RemoteTool connection management API is preview
+use `2026-04-01`; the MCP endpoint uses `2026-08-01-preview` and the RemoteTool connection management API is preview
 (`2025-10-01-preview`). This new provisioning path is validated offline, with
 **live Azure setup and the known/unknown smoke test still required**.
 
@@ -111,7 +111,8 @@ Fill in `.env` with your actual values. Do not include tokens or keys in endpoin
 | `MAX_QUESTION_CHARS` | Question length limit; defaults to 8000 characters |
 | `HISTORY_TURNS` | Retained question/answer pairs; defaults to 6; 0 disables history |
 
-The example uses GA Search API `2026-04-01`, which returns extractive data. If your KB configuration requires another version, use the endpoint provided by Azure. Assess preview features separately before production deployment. The parser accepts grounding records with `ref_id` and nonempty `content`, directly or wrapped in MCP `content[].text` / `result.content[].text`. Other formats are rejected.
+The lab uses GA Search API `2026-04-01` to provision the index and knowledge base,
+and preview API `2026-08-01-preview` for the MCP endpoint. If your KB configuration requires another version, use the endpoint provided by Azure. Assess preview features separately before production deployment. The parser accepts grounding records with `ref_id` and nonempty `content`, directly or wrapped in MCP `content[].text` / `result.content[].text`. Other formats are rejected.
 
 ## Create a version and verify the deployment
 
@@ -206,3 +207,13 @@ cited reference IDs, provider token usage when present and its terminal outcome.
 Observation happens before grounding validation, so rejected answers remain visible.
 Raw questions, answers, retrieved chunks and tool arguments are excluded.
 The platform enables this automatically; clients launched elsewhere must opt in.
+
+## Repair an existing lab MCP endpoint
+
+If the MCP server rejects the API version, run `python scripts/lab.py repair-mcp`.
+This verifies recorded group ownership, updates the existing RemoteTool connection,
+updates the saved endpoint, and creates or reuses an agent version with a new local
+manifest. It does not provision infrastructure or change the corpus. A failed update
+leaves `ready=false` and can be retried. Then run `python scripts/lab.py smoke`.
+Existing clients pinned to an older version retain that version; move them only after
+verifying the candidate. MCP is preview even though the provisioning Search API is GA.
